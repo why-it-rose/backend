@@ -1,0 +1,6 @@
+rootProject.name = 'why-it-rose'
+
+include 'core'
+include 'domain'
+include 'api-server'
+include 'batch'
