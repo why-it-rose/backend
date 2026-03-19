@@ -6,6 +6,7 @@ import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(
@@ -57,14 +58,18 @@ public class User extends BaseTimeEntity {
     @Column(name = "marketing_agreed", nullable = false)
     private boolean marketingAgreed;
 
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
     // DEFAULT 'ACTIVE'
     @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 20, nullable = false)
     private Status status;
 
-    public static User create(String email, String passwordHash, String nickname,
-                              AuthProvider provider, String providerUid) {
+    public static User create(String name, String email, String passwordHash, String nickname,
+                               AuthProvider provider, String providerUid) {
         User user = new User();
+        user.name = name;
         user.email = email;
         user.passwordHash = passwordHash;
         user.nickname = nickname;
@@ -90,5 +95,6 @@ public class User extends BaseTimeEntity {
 
     public void delete() {
         this.status = Status.DELETED;
+        this.deletedAt = LocalDateTime.now();
     }
 }
