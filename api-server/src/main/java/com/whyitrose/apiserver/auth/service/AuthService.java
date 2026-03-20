@@ -1,14 +1,16 @@
 package com.whyitrose.apiserver.auth.service;
 
+import com.whyitrose.apiserver.auth.dto.LoginRequest;
+import com.whyitrose.apiserver.auth.dto.LoginResponse;
 import com.whyitrose.apiserver.auth.dto.SignupRequest;
 import com.whyitrose.apiserver.auth.dto.UserResponse;
 import com.whyitrose.apiserver.auth.exception.AuthErrorCode;
 import com.whyitrose.core.exception.BaseException;
+import com.whyitrose.domain.common.Status;
 import com.whyitrose.domain.user.AuthProvider;
 import com.whyitrose.domain.user.User;
 import com.whyitrose.domain.user.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,7 +44,29 @@ public class AuthService {
 
         return UserResponse.from(userRepository.save(user));
     }
-//이메일 정규화
+
+    public LoginResponse login(LoginRequest request) {
+        String email = normalizeEmail(request.email());
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new BaseException(AuthErrorCode.AUTH_011));
+
+        if (user.getStatus() == Status.DELETED) {
+            throw new BaseException(AuthErrorCode.AUTH_013);
+        }
+
+        if (user.getProvider() != AuthProvider.EMAIL) {
+            throw new BaseException(AuthErrorCode.AUTH_012);
+        }
+
+        if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+            throw new BaseException(AuthErrorCode.AUTH_011);
+        }
+
+        return new LoginResponse(user.getId(), user.getEmail(), user.getNickname());
+    }
+
+    //이메일 정규화
     private String normalizeEmail(String email) {
         return email.trim().toLowerCase();
     }
