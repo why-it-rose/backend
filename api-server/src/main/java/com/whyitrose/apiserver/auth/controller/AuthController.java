@@ -1,5 +1,7 @@
 package com.whyitrose.apiserver.auth.controller;
 
+import com.whyitrose.apiserver.auth.dto.LoginRequest;
+import com.whyitrose.apiserver.auth.dto.LoginResponse;
 import com.whyitrose.apiserver.auth.dto.SignupRequest;
 import com.whyitrose.apiserver.auth.dto.UserResponse;
 import com.whyitrose.apiserver.auth.service.AuthService;
@@ -23,5 +25,11 @@ public class AuthController {
                 .status(HttpStatus.CREATED)
                 .body(BaseResponse.success(authService.signup(request)));
     }
+
+    @PostMapping("/login")
+    public ResponseEntity<BaseResponse<LoginResponse>> login(@RequestBody @Valid LoginRequest request) {
+        return ResponseEntity.ok(BaseResponse.success(authService.login(request)));
+    }
+
 
 }
