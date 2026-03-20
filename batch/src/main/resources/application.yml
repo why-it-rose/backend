@@ -1,0 +1,20 @@
+spring:
+  application:
+    name: why-it-rose-batch
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:local}
+  batch:
+    job:
+      enabled: false
+
+stock:
+  master:
+    load-at-startup: false
+
+ls:
+  openapi:
+    base-url: ${LS_OPENAPI_BASE_URL:https://openapi.ls-sec.co.kr:8080}
+    access-token: ${LS_ACCESS_TOKEN:}
+    seed-resource: classpath:seed/index-universe.json
+    min-interval-ms: 500
+    full-master-when-seed-empty: true
