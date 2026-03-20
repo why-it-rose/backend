@@ -11,6 +11,3 @@ spring:
     properties:
       hibernate:
         format_sql: true
-logging:
-  level:
-    com.whyitrose.batch.event: DEBUG
