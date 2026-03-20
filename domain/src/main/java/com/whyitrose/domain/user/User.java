@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(
+        // 실제 db 테이블 이름
         name = "users",
         uniqueConstraints = {
                 @UniqueConstraint(name = "uq_users_email", columnNames = {"email"}),
@@ -29,7 +30,7 @@ public class User extends BaseTimeEntity {
     private Long id;
 
     // 소셜 전용이면 null
-    @Column(name = "email", length = 255)
+    @Column(name = "email", length = 255, nullable = false)
     private String email;
 
     // 소셜 전용이면 null
