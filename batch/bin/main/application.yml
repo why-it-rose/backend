@@ -1,5 +1,0 @@
-spring:
-  application:
-    name: why-it-rose-batch
-  profiles:
-    active: ${SPRING_PROFILES_ACTIVE:local}

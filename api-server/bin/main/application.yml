@@ -1,5 +1,0 @@
-spring:
-  application:
-    name: why-it-rose
-  profiles:
-    active: ${SPRING_PROFILES_ACTIVE:local}
