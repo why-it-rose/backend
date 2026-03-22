@@ -24,3 +24,7 @@ ls:
     # t8451 전역 스로틀 (초당 1건 ≒ 1000ms)
     chart-min-interval-ms: ${LS_CHART_MIN_INTERVAL_MS:1000}
     full-master-when-seed-empty: true
+
+logging:
+  level:
+    com.whyitrose.batch.event: INFO
