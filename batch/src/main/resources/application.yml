@@ -6,9 +6,13 @@ spring:
   batch:
     job:
       enabled: false
+  main:
+    web-application-type: none
 
 stock:
   master:
+    load-at-startup: false
+  price:
     load-at-startup: false
 
 ls:
@@ -17,6 +21,8 @@ ls:
     access-token: ${LS_ACCESS_TOKEN:}
     seed-resource: classpath:seed/index-universe.json
     min-interval-ms: 500
+    # t8451 전역 스로틀 (초당 1건 ≒ 1000ms)
+    chart-min-interval-ms: ${LS_CHART_MIN_INTERVAL_MS:1000}
     full-master-when-seed-empty: true
 
 logging:
