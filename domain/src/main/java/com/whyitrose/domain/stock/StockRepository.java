@@ -10,6 +10,7 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
     Optional<Stock> findByTicker(String ticker);
 
     List<Stock> findByStatus(Status status);
+    List<Stock> findByStatusOrderByIdAsc(Status status);
 
     boolean existsByTicker(String ticker);
 }

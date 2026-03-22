@@ -101,11 +101,12 @@ KOSPI 200 + KOSDAQ 50 = **250종목**을 **어떻게 저장할지**, **저장할
 | **stock_id** | BIGINT (FK→stocks.id) | ✓ | §5 candles는 stock 단위 | stocks.id | ticker로 저장해도 됨(조회 시 stocks와 조인) |
 | **trade_date** | DATE | ✓ | §5 `candles[].date` | LS t8451 응답 일자 (YYYY-MM-DD) |  |
 | **period** | VARCHAR(10) 또는 ENUM | ✓ | §5 period는 “주기” | `DAILY` \| `WEEKLY` \| `MONTHLY` \| `YEARLY` | t8451 gubun 2/3/4/5에 대응 |
-| **open** | BIGINT | ✓ | §5 `candles[].open` | t8451 시가 (원) |  |
-| **high** | BIGINT | ✓ | §5 `candles[].high` | t8451 고가 (원) |  |
-| **low** | BIGINT | ✓ | §5 `candles[].low` | t8451 저가 (원) |  |
-| **close** | BIGINT | ✓ | §5 `candles[].close` | t8451 종가 (원) |  |
+| **open_price** | BIGINT | ✓ | §5 `candles[].open` | t8451 시가 (원) |  |
+| **high_price** | BIGINT | ✓ | §5 `candles[].high` | t8451 고가 (원) |  |
+| **low_price** | BIGINT | ✓ | §5 `candles[].low` | t8451 저가 (원) |  |
+| **close_price** | BIGINT | ✓ | §5 `candles[].close` | t8451 종가 (원) |  |
 | **volume** | BIGINT | ✓ | §5 `candles[].volume` | t8451 거래량 (주), LS `jdiff_vol` 등 |  |
+**created_at**
 
 **인덱스**: (stock_id, period, trade_date) 또는 (ticker, period, trade_date) — 차트·기간 조회용.
 
