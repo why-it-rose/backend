@@ -66,6 +66,48 @@ public class AuthService {
         return new LoginResponse(user.getId(), user.getEmail(), user.getNickname());
     }
 
+    //외부 인증 결과를 가지고 우리 회원 정책에 맞게 로그인/가입을 결정
+    public LoginResponse loginOrRegisterSocial(AuthProvider provider, String providerUid, String email, String name) {
+        String normalizedEmail = normalizeEmail(email);
+        //먼저 provider + providerUid로 조회
+        User byProvider = userRepository.findByProviderAndProviderUid(provider, providerUid).orElse(null);
+        if (byProvider != null) {
+            if (byProvider.getStatus() == Status.DELETED) {
+                throw new BaseException(AuthErrorCode.AUTH_013);
+            }
+            return new LoginResponse(byProvider.getId(), byProvider.getEmail(), byProvider.getNickname());
+        }
+        //없으면 email로 조회
+        User byEmail = userRepository.findByEmail(normalizedEmail).orElse(null);
+        if (byEmail != null) {
+            throw new BaseException(AuthErrorCode.AUTH_015);
+        }
+
+        String resolvedName = (name == null || name.isBlank()) ? "user" : name.trim();
+        String nickname = resolveUniqueNickname(resolvedName);
+        //새 가입자 가입 처리
+        User created = User.create(
+                resolvedName,
+                normalizedEmail,
+                null,
+                nickname,
+                provider,
+                providerUid
+        );
+
+        User saved = userRepository.save(created);
+        return new LoginResponse(saved.getId(), saved.getEmail(), saved.getNickname());
+    }
+
+    private String resolveUniqueNickname(String base) {
+        String candidate = base;
+        int seq = 1;
+        while (userRepository.existsByNickname(candidate)) {
+            candidate = base + seq++;
+        }
+        return candidate;
+    }
+
     //이메일 정규화
     private String normalizeEmail(String email) {
         return email.trim().toLowerCase();
