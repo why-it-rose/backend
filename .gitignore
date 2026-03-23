@@ -44,3 +44,8 @@ Network Trash Folder
 Temporary Items
 .apdisk
 
+# local env files
+.env
+*.env
+api-server/.env
+
