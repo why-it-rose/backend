@@ -28,15 +28,17 @@ public class SecurityConfig {
                                 "/auth/signup",
                                 "/auth/login",
                                 "/oauth2/**",
-                                "/login/oauth2/**"
+                                "/login/oauth2/**",
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth2 -> oauth2
                         .userInfoEndpoint(userInfo -> userInfo
-                                .userService(customOAuth2UserService) // provider에서 받은 사용자 정보를 읽을 때 사용
+                                .userService(customOAuth2UserService)
                         )
-                        .successHandler(oAuth2AuthenticationSuccessHandler) // 성공 직후 handler태워 AuthService로 넘김
+                        .successHandler(oAuth2AuthenticationSuccessHandler)
                 );
 
         return http.build();
