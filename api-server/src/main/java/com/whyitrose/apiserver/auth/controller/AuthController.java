@@ -1,9 +1,6 @@
 package com.whyitrose.apiserver.auth.controller;
 
-import com.whyitrose.apiserver.auth.dto.LoginRequest;
-import com.whyitrose.apiserver.auth.dto.LoginResponse;
-import com.whyitrose.apiserver.auth.dto.SignupRequest;
-import com.whyitrose.apiserver.auth.dto.UserResponse;
+import com.whyitrose.apiserver.auth.dto.*;
 import com.whyitrose.apiserver.auth.service.AuthService;
 import com.whyitrose.core.response.BaseResponse;
 import jakarta.validation.Valid;
@@ -30,6 +27,12 @@ public class AuthController {
     public ResponseEntity<BaseResponse<LoginResponse>> login(@RequestBody @Valid LoginRequest request) {
         return ResponseEntity.ok(BaseResponse.success(authService.login(request)));
     }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<BaseResponse<LoginResponse>> refresh(@RequestBody @Valid RefreshTokenRequest request) {
+        return ResponseEntity.ok(BaseResponse.success(authService.refresh(request.refreshToken())));
+    }
+
 
 
 }
