@@ -27,15 +27,15 @@ public class JwtTokenProvider {
         this.accessTokenExpirationMs = accessTokenExpirationMs;
         this.refreshTokenExpirationMs = refreshTokenExpirationMs;
     }
-    // access token 생성
+
     public String createAccessToken(Long userId) {
         return createToken(userId, "ACCESS", accessTokenExpirationMs);
     }
-    // refresh token 생성
+
     public String createRefreshToken(Long userId) {
         return createToken(userId, "REFRESH", refreshTokenExpirationMs);
     }
-    // 토큰 파싱/검증
+
     public JwtClaims parseClaims(String token) {
         Claims claims = Jwts.parser()
                 .verifyWith(key)
@@ -47,6 +47,14 @@ public class JwtTokenProvider {
                 Long.parseLong(claims.getSubject()),
                 claims.get("token_type", String.class)
         );
+    }
+
+    public long getAccessTokenExpirationMs() {
+        return accessTokenExpirationMs;
+    }
+
+    public long getRefreshTokenExpirationMs() {
+        return refreshTokenExpirationMs;
     }
 
     private String createToken(Long userId, String tokenType, long expirationMs) {
