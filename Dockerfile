@@ -1,6 +1,8 @@
 # ── Stage 1: Build ───────────────────────────────────────────────────────────
 FROM gradle:8.5-jdk17 AS builder
 
+ARG MODULE=api-server
+
 WORKDIR /app
 
 # 의존성 레이어 캐싱: 각 모듈의 build.gradle을 소스보다 먼저 복사
@@ -14,17 +16,19 @@ RUN gradle dependencies --no-daemon
 
 # 전체 소스 복사 후 빌드
 COPY . .
-RUN ./gradlew :api-server:build -x test --no-daemon
+RUN ./gradlew :${MODULE}:build -x test --no-daemon
 
 # ── Stage 2: Runtime ──────────────────────────────────────────────────────────
 FROM eclipse-temurin:17-jre-jammy
+
+ARG MODULE=api-server
 
 WORKDIR /app
 
 # non-root 유저 생성 (보안)
 RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
 
-COPY --from=builder /app/api-server/build/libs/*.jar app.jar
+COPY --from=builder /app/${MODULE}/build/libs/*.jar app.jar
 RUN chown appuser:appgroup app.jar
 
 USER appuser
