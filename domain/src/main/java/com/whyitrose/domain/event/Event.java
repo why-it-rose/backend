@@ -68,6 +68,11 @@ public class Event extends BaseTimeEntity {
     @Column(name = "status", length = 20, nullable = false)
     private Status status;
 
+    // DEFAULT 'PENDING'
+    @Enumerated(EnumType.STRING)
+    @Column(name = "crawl_status", length = 20, nullable = false)
+    private Status crawlStatus;
+
     @OneToMany(mappedBy = "event", fetch = FetchType.LAZY)
     private List<EventNews> eventNewsList = new ArrayList<>();
 
