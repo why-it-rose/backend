@@ -7,9 +7,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum AuthProvider {
 
-    EMAIL("이메일"),
-    KAKAO("카카오"),
-    GOOGLE("구글");
+    EMAIL("이메일");
 
     private final String description;
 }
