@@ -9,6 +9,11 @@ pipeline {
             defaultValue: '',
             description: 'Docker image tag (git SHA, GitHub Actions에서 전달)'
         )
+        string(
+            name: 'BATCH_IMAGE_TAG',
+            defaultValue: '',
+            description: 'batch Docker image tag'
+        )
     }
 
     environment {
@@ -18,7 +23,7 @@ pipeline {
     stages {
         stage('Deploy') {
             steps {
-                deploySpring(env: DEPLOY_ENV, imageTag: IMAGE_TAG)
+                deploySpring(env: DEPLOY_ENV, imageTag: IMAGE_TAG, batchImageTag: params.BATCH_IMAGE_TAG)
             }
         }
     }
