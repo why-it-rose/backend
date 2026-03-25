@@ -1,0 +1,9 @@
+spring:
+  batch:
+    job:
+      enabled: true
+      name: stockPriceLoadJob
+
+stock:
+  price:
+    days-back: 1

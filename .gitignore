@@ -4,6 +4,7 @@
 *.iml
 *.ipr
 out/
+bin/
 
 # Gradle
 .gradle/
@@ -43,4 +44,9 @@ Icon
 Network Trash Folder
 Temporary Items
 .apdisk
+
+# local env files
+.env
+*.env
+api-server/.env
 

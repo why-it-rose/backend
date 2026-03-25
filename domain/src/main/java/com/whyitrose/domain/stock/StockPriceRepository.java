@@ -11,7 +11,16 @@ import java.util.Optional;
 
 public interface StockPriceRepository extends JpaRepository<StockPrice, Long> {
 
-    Optional<StockPrice> findByStockIdAndTradingDate(Long stockId, LocalDate tradingDate);
+    @Query("SELECT sp FROM StockPrice sp " +
+           "WHERE sp.stock.id = :stockId " +
+           "AND sp.tradingDate = :tradingDate " +
+           "AND sp.period = com.whyitrose.domain.stock.StockPricePeriod.DAILY")
+    Optional<StockPrice> findByStockIdAndTradingDate(
+            @Param("stockId") Long stockId,
+            @Param("tradingDate") LocalDate tradingDate);
+
+    Optional<StockPrice> findByStockIdAndTradingDateAndPeriod(
+            Long stockId, LocalDate tradingDate, StockPricePeriod period);
 
     List<StockPrice> findByStockIdAndTradingDateBetweenOrderByTradingDateAsc(
             Long stockId, LocalDate from, LocalDate to);
@@ -21,7 +30,9 @@ public interface StockPriceRepository extends JpaRepository<StockPrice, Long> {
 
     // 특정 날짜 이전 최근 N개 거래일 주가 조회 (거래량 평균 계산용)
     @Query("SELECT sp FROM StockPrice sp " +
-           "WHERE sp.stock.id = :stockId AND sp.tradingDate < :targetDate " +
+           "WHERE sp.stock.id = :stockId " +
+           "AND sp.period = com.whyitrose.domain.stock.StockPricePeriod.DAILY " +
+           "AND sp.tradingDate < :targetDate " +
            "ORDER BY sp.tradingDate DESC")
     List<StockPrice> findRecentPricesBeforeDate(
             @Param("stockId") Long stockId,

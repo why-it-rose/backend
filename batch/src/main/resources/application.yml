@@ -6,15 +6,30 @@ spring:
   batch:
     job:
       enabled: false
+    jdbc:
+      initialize-schema: always
+  main:
+    web-application-type: none
 
 stock:
   master:
     load-at-startup: false
+  price:
+    load-at-startup: false
+    thread-count: ${STOCK_PRICE_THREAD_COUNT:4}
 
 ls:
   openapi:
     base-url: ${LS_OPENAPI_BASE_URL:https://openapi.ls-sec.co.kr:8080}
+    app-key: ${LS_APP_KEY:}
+    app-secret: ${LS_APP_SECRET:}
     access-token: ${LS_ACCESS_TOKEN:}
     seed-resource: classpath:seed/index-universe.json
     min-interval-ms: 500
+    # t8451 전역 스로틀 (초당 1건 ≒ 1000ms)
+    chart-min-interval-ms: ${LS_CHART_MIN_INTERVAL_MS:1000}
     full-master-when-seed-empty: true
+
+logging:
+  level:
+    com.whyitrose.batch.event: INFO

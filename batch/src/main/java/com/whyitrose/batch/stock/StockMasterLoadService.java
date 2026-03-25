@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.whyitrose.batch.config.LsOpenApiProperties;
 import com.whyitrose.batch.ls.LsMarketDataClient;
 import com.whyitrose.domain.stock.Stock;
+import com.whyitrose.domain.stock.StockMarket;
 import com.whyitrose.domain.stock.StockRepository;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -63,8 +64,8 @@ public class StockMasterLoadService {
         List<JsonNode> kosdaqRows = lsMarketDataClient.fetchAllMasterRows("2");
 
         List<ParsedRow> parsed = new ArrayList<>();
-        parsed.addAll(parseRows(kospiRows, "KOSPI", seed.displayOrder()));
-        parsed.addAll(parseRows(kosdaqRows, "KOSDAQ", seed.displayOrder()));
+        parsed.addAll(parseRows(kospiRows, StockMarket.KOSPI));
+        parsed.addAll(parseRows(kosdaqRows, StockMarket.KOSDAQ));
 
         List<ParsedRow> toSave = applySeedFilter(parsed, seed);
 
@@ -85,24 +86,15 @@ public class StockMasterLoadService {
     }
 
     private void upsertOne(ParsedRow row) {
-        stockRepository
-                .findByTicker(row.ticker())
-                .map(existing -> {
-                    existing.applyMaster(
-                            row.name(),
-                            row.market(),
-                            row.displayOrder(),
-                            existing.getSector(),
-                            buildLogoUrl(row.ticker()));
-                    return stockRepository.save(existing);
-                })
-                .orElseGet(() -> stockRepository.save(Stock.create(
-                        row.ticker(),
-                        row.name(),
-                        row.market(),
-                        row.displayOrder(),
-                        null,
-                        buildLogoUrl(row.ticker()))));
+        if (stockRepository.existsByTicker(row.ticker())) {
+            return;
+        }
+        stockRepository.save(Stock.create(
+                row.ticker(),
+                row.name(),
+                row.market(),
+                null,
+                buildLogoUrl(row.ticker())));
     }
 
     private List<ParsedRow> applySeedFilter(List<ParsedRow> rows, SeedContext seed) {
@@ -113,14 +105,13 @@ public class StockMasterLoadService {
         List<ParsedRow> out = new ArrayList<>();
         for (ParsedRow r : rows) {
             if (allow.contains(r.ticker())) {
-                Integer ord = seed.displayOrder().get(r.ticker());
-                out.add(r.withDisplayOrder(ord));
+                out.add(r);
             }
         }
         return out;
     }
 
-    private List<ParsedRow> parseRows(List<JsonNode> nodes, String market, Map<String, Integer> order) {
+    private List<ParsedRow> parseRows(List<JsonNode> nodes, StockMarket market) {
         List<ParsedRow> list = new ArrayList<>();
         for (JsonNode n : nodes) {
             String rawCode = text(n, "shcode");
@@ -133,12 +124,10 @@ public class StockMasterLoadService {
                 log.debug("종목명 없음, 스킵: {}", ticker);
                 continue;
             }
-            Integer ord = order.get(ticker);
             list.add(new ParsedRow(
                     ticker,
                     name.trim(),
-                    market,
-                    ord));
+                    market));
         }
         return list;
     }
@@ -211,13 +200,7 @@ public class StockMasterLoadService {
     private record ParsedRow(
             String ticker,
             String name,
-            String market,
-            Integer displayOrder) {
-
-        ParsedRow withDisplayOrder(Integer order) {
-            return new ParsedRow(ticker, name, market, order);
-        }
-    }
+            StockMarket market) {}
 
     private record SeedContext(boolean active, Map<String, Integer> displayOrder, int kospiCount, int kosdaqCount) {
 

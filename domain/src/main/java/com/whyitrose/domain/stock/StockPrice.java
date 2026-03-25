@@ -13,10 +13,10 @@ import java.time.LocalDate;
 @Table(
         name = "stock_prices",
         uniqueConstraints = {
-                @UniqueConstraint(name = "uq_stock_prices", columnNames = {"stock_id", "trading_date"})
+                @UniqueConstraint(name = "uq_stock_prices", columnNames = {"stock_id", "trading_date", "period"})
         },
         indexes = {
-                @Index(name = "idx_stock_prices_date", columnList = "stock_id, trading_date")
+                @Index(name = "idx_stock_prices_date", columnList = "stock_id, period, trading_date")
         }
 )
 @Getter
@@ -35,6 +35,10 @@ public class StockPrice extends BaseTimeEntity {
     // 거래일
     @Column(name = "trading_date", nullable = false)
     private LocalDate tradingDate;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "period", length = 20, nullable = false)
+    private StockPricePeriod period;
 
     // 시가
     @Column(name = "open_price", nullable = false)
@@ -62,11 +66,13 @@ public class StockPrice extends BaseTimeEntity {
     private Status status;
 
     public static StockPrice create(Stock stock, LocalDate tradingDate,
+                                    StockPricePeriod period,
                                     int openPrice, int closePrice,
                                     int highPrice, int lowPrice, long volume) {
         StockPrice stockPrice = new StockPrice();
         stockPrice.stock = stock;
         stockPrice.tradingDate = tradingDate;
+        stockPrice.period = period;
         stockPrice.openPrice = openPrice;
         stockPrice.closePrice = closePrice;
         stockPrice.highPrice = highPrice;
@@ -74,6 +80,15 @@ public class StockPrice extends BaseTimeEntity {
         stockPrice.volume = volume;
         stockPrice.status = Status.ACTIVE;
         return stockPrice;
+    }
+
+    public void applyPrice(int openPrice, int closePrice, int highPrice, int lowPrice, long volume) {
+        this.openPrice = openPrice;
+        this.closePrice = closePrice;
+        this.highPrice = highPrice;
+        this.lowPrice = lowPrice;
+        this.volume = volume;
+        this.status = Status.ACTIVE;
     }
 
     public void delete() {

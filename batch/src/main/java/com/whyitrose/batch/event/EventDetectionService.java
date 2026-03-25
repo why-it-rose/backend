@@ -39,33 +39,38 @@ public class EventDetectionService {
 
     /**
      * targetDate 하루치 전체 ACTIVE 종목에 대해 이벤트 탐지 실행
+     * @return 생성된 이벤트 수
      */
     @Transactional
-    public void detectAndSaveEvents(LocalDate targetDate) {
+    public int detectAndSaveEvents(LocalDate targetDate) {
         List<Stock> activeStocks = stockRepository.findByStatus(Status.ACTIVE);
         log.info("[EventDetection] 탐지 시작 — targetDate={}, 대상종목={}개", targetDate, activeStocks.size());
 
+        int createdCount = 0;
         for (Stock stock : activeStocks) {
             try {
-                detectForStock(stock, targetDate);
+                if (detectForStock(stock, targetDate)) {
+                    createdCount++;
+                }
             } catch (Exception e) {
                 log.warn("[EventDetection] 종목 처리 중 오류 — ticker={}, date={}, msg={}",
                         stock.getTicker(), targetDate, e.getMessage());
             }
         }
 
-        log.info("[EventDetection] 탐지 완료 — targetDate={}", targetDate);
+        log.info("[EventDetection] 탐지 완료 — targetDate={}, 생성={}개", targetDate, createdCount);
+        return createdCount;
     }
 
     // ── 종목별 단일일 이벤트 탐지 ─────────────────────────────────────
 
-    private void detectForStock(Stock stock, LocalDate targetDate) {
+    private boolean detectForStock(Stock stock, LocalDate targetDate) {
         StockPrice curr = stockPriceRepository
                 .findByStockIdAndTradingDate(stock.getId(), targetDate)
                 .orElse(null);
 
         if (curr == null) {
-            return; // 해당일 주가 데이터 없음
+            return false; // 해당일 주가 데이터 없음
         }
 
         // 전일 주가 조회 (targetDate 기준 바로 이전 거래일 1개)
@@ -73,7 +78,7 @@ public class EventDetectionService {
                 stock.getId(), targetDate, PageRequest.of(0, 1));
 
         if (prevList.isEmpty()) {
-            return; // 비교할 전일 데이터 없음
+            return false; // 비교할 전일 데이터 없음
         }
 
         StockPrice prev = prevList.get(0);
@@ -84,17 +89,17 @@ public class EventDetectionService {
         // ② 가격 조건 판단
         EventType eventType = resolveEventType(changePct);
         if (eventType == null) {
-            return; // 임계값 미달
+            return false; // 임계값 미달
         }
 
         // ③ 거래량 조건 판단
         if (!isVolumeConditionMet(stock.getId(), targetDate, curr.getVolume())) {
             log.debug("[EventDetection] 거래량 조건 미충족 — ticker={}, date={}", stock.getTicker(), targetDate);
-            return;
+            return false;
         }
 
         // ④ 이벤트 저장
-        saveEvent(stock, eventType, targetDate, prev.getClosePrice(), curr.getClosePrice(), changePct);
+        return saveEvent(stock, eventType, targetDate, prev.getClosePrice(), curr.getClosePrice(), changePct);
     }
 
     // ── 변동률 계산 ───────────────────────────────────────────────────
@@ -136,14 +141,14 @@ public class EventDetectionService {
     // ── 이벤트 저장 (중복 방지 포함) ─────────────────────────────────
 
     @Transactional
-    protected void saveEvent(Stock stock, EventType eventType,
+    protected boolean saveEvent(Stock stock, EventType eventType,
                              LocalDate targetDate, int priceBefore, int priceAfter,
                              BigDecimal changePct) {
 
         // 동일 stock_id + start_date 중복 방지
         if (eventRepository.existsByStockIdAndStartDate(stock.getId(), targetDate)) {
             log.debug("[EventDetection] 이미 존재하는 이벤트 — ticker={}, date={}", stock.getTicker(), targetDate);
-            return;
+            return false;
         }
 
         Event event = Event.create(stock, eventType, targetDate, targetDate,
@@ -152,5 +157,6 @@ public class EventDetectionService {
 
         log.info("[EventDetection] 이벤트 저장 — ticker={}, type={}, date={}, changePct={}%",
                 stock.getTicker(), eventType, targetDate, changePct);
+        return true;
     }
 }
