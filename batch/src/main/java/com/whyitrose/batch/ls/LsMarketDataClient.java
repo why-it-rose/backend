@@ -36,6 +36,7 @@ public class LsMarketDataClient {
     private static final int CHART_RETRY_MAX_ATTEMPTS = 60;
 
     private final LsOpenApiProperties properties;
+    private final LsTokenClient tokenClient;
     private final ObjectMapper objectMapper;
     private final RestTemplate restTemplate;
 
@@ -43,8 +44,9 @@ public class LsMarketDataClient {
     private final Object t8451ThrottleLock = new Object();
     private long lastT8451RequestStartMillis = 0L;
 
-    public LsMarketDataClient(LsOpenApiProperties properties, ObjectMapper objectMapper) {
+    public LsMarketDataClient(LsOpenApiProperties properties, LsTokenClient tokenClient, ObjectMapper objectMapper) {
         this.properties = properties;
+        this.tokenClient = tokenClient;
         this.objectMapper = objectMapper;
         this.restTemplate = new RestTemplate();
     }
@@ -125,13 +127,17 @@ public class LsMarketDataClient {
     }
 
     public List<JsonNode> fetchAllChartRows(String shcode, String gubun, String exchgubun) throws InterruptedException {
+        return fetchAllChartRows(shcode, gubun, exchgubun, "");
+    }
+
+    public List<JsonNode> fetchAllChartRows(String shcode, String gubun, String exchgubun, String sdate) throws InterruptedException {
         List<JsonNode> rows = new ArrayList<>();
         String sendCont = "N";
         String sendKey = "";
         String ctsDate = "";
 
         while (true) {
-            ResponseEntity<String> response = postChartDataWithRetry(shcode, gubun, exchgubun, sendCont, sendKey, ctsDate);
+            ResponseEntity<String> response = postChartDataWithRetry(shcode, gubun, exchgubun, sendCont, sendKey, ctsDate, sdate);
             String body = response.getBody();
             if (body == null || body.isBlank()) {
                 throw new IllegalStateException("LS API 응답 body가 비어 있습니다. shcode=" + shcode + ", gubun=" + gubun);
@@ -194,7 +200,8 @@ public class LsMarketDataClient {
             String exchgubun,
             String trCont,
             String trContKey,
-            String ctsDate) throws InterruptedException {
+            String ctsDate,
+            String sdate) throws InterruptedException {
         acquireT8451Slot();
 
         String base = properties.getBaseUrl().replaceAll("/+$", "");
@@ -207,7 +214,7 @@ public class LsMarketDataClient {
         inBlock.put("shcode", shcode);
         inBlock.put("gubun", gubun);
         inBlock.put("qrycnt", 500);
-        inBlock.put("sdate", "");
+        inBlock.put("sdate", sdate == null ? "" : sdate);
         inBlock.put("edate", "99999999");
         inBlock.put("cts_date", ctsDate == null ? "" : ctsDate);
         inBlock.put("comp_yn", "N");
@@ -247,12 +254,13 @@ public class LsMarketDataClient {
             String exchgubun,
             String trCont,
             String trContKey,
-            String ctsDate) throws InterruptedException {
+            String ctsDate,
+            String sdate) throws InterruptedException {
         long baseDelayMs = Math.max(properties.getChartMinIntervalMs(), 1200L);
         long maxDelayMs = 10_000L;
         for (int attempt = 1; attempt <= CHART_RETRY_MAX_ATTEMPTS; attempt++) {
             try {
-                return postChartData(shcode, gubun, exchgubun, trCont, trContKey, ctsDate);
+                return postChartData(shcode, gubun, exchgubun, trCont, trContKey, ctsDate, sdate);
             } catch (IllegalStateException ex) {
                 if (!isRateLimitException(ex) || attempt == CHART_RETRY_MAX_ATTEMPTS) {
                     throw ex;
@@ -285,7 +293,7 @@ public class LsMarketDataClient {
     private HttpHeaders defaultHeaders(String trCd, String trCont, String trContKey) {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Content-Type", "application/json; charset=utf-8");
-        headers.set("authorization", "Bearer " + properties.getAccessToken().trim());
+        headers.set("authorization", "Bearer " + tokenClient.getToken());
         headers.set("tr_cd", trCd);
         headers.set("tr_cont", trCont == null || trCont.isBlank() ? "N" : trCont);
         headers.set("tr_cont_key", trContKey == null ? "" : trContKey);
