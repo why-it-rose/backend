@@ -6,3 +6,7 @@ spring:
     group:
       local:
         - oauth
+      dev:
+        - oauth
+      prod:
+        - oauth
