@@ -11,7 +11,6 @@ spring:
     properties:
       hibernate:
         format_sql: true
-
 jwt:
   secret: ${JWT_SECRET}
   access-token-expiration-ms: ${JWT_ACCESS_TOKEN_EXPIRATION_MS:1800000}

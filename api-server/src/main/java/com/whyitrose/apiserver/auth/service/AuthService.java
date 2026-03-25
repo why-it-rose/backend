@@ -60,47 +60,11 @@ public class AuthService {
             throw new BaseException(AuthErrorCode.AUTH_013);
         }
 
-        if (user.getProvider() != AuthProvider.EMAIL) {
-            throw new BaseException(AuthErrorCode.AUTH_012);
-        }
-
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             throw new BaseException(AuthErrorCode.AUTH_011);
         }
 
         return toLoginResponse(user);
-    }
-
-    public LoginResponse loginOrRegisterSocial(AuthProvider provider, String providerUid, String email, String name) {
-        String normalizedEmail = normalizeEmail(email);
-
-        User byProvider = userRepository.findByProviderAndProviderUid(provider, providerUid).orElse(null);
-        if (byProvider != null) {
-            if (byProvider.getStatus() == Status.DELETED) {
-                throw new BaseException(AuthErrorCode.AUTH_013);
-            }
-            return toLoginResponse(byProvider);
-        }
-
-        User byEmail = userRepository.findByEmail(normalizedEmail).orElse(null);
-        if (byEmail != null) {
-            throw new BaseException(AuthErrorCode.AUTH_015);
-        }
-
-        String resolvedName = (name == null || name.isBlank()) ? "user" : name.trim();
-        String nickname = resolveUniqueNickname(resolvedName);
-
-        User created = User.create(
-                resolvedName,
-                normalizedEmail,
-                null,
-                nickname,
-                provider,
-                providerUid
-        );
-
-        User saved = userRepository.save(created);
-        return toLoginResponse(saved);
     }
 
     public LoginResponse refresh(String refreshToken) {
@@ -138,15 +102,6 @@ public class AuthService {
                 accessToken,
                 refreshToken
         );
-    }
-
-    private String resolveUniqueNickname(String base) {
-        String candidate = base;
-        int seq = 1;
-        while (userRepository.existsByNickname(candidate)) {
-            candidate = base + seq++;
-        }
-        return candidate;
     }
 
     private String normalizeEmail(String email) {

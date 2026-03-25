@@ -14,12 +14,7 @@ public enum AuthErrorCode implements ResponseStatus {
     AUTH_009(false, HttpStatus.BAD_REQUEST, 4009, "입력값이 유효하지 않습니다."),
     AUTH_010(false, HttpStatus.BAD_REQUEST, 4010, "이미 사용 중인 닉네임입니다."),
     AUTH_011(false, HttpStatus.BAD_REQUEST, 4011, "이메일 또는 비밀번호가 올바르지 않습니다."),
-    AUTH_012(false, HttpStatus.BAD_REQUEST, 4012, "소셜 가입 계정은 이메일 로그인이 불가합니다."),
-    AUTH_013(false, HttpStatus.BAD_REQUEST, 4013, "탈퇴한 계정입니다."),
-    AUTH_014(false, HttpStatus.BAD_REQUEST, 4014, "소셜 계정의 이메일 정보를 가져올 수 없습니다."),
-    AUTH_015(false, HttpStatus.BAD_REQUEST, 4015, "이미 다른 방식으로 가입된 이메일입니다."),
-    AUTH_016(false, HttpStatus.BAD_REQUEST, 4016, "지원하지 않는 소셜 로그인 제공자입니다.");
-
+    AUTH_013(false, HttpStatus.BAD_REQUEST, 4013, "탈퇴한 계정입니다.");
 
     private final boolean isSuccess;
     @JsonIgnore
