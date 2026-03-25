@@ -1,5 +1,9 @@
 apply plugin: 'org.springframework.boot'
 
+tasks.named('bootRun') {
+    workingDir = rootProject.projectDir
+}
+
 dependencies {
     implementation project(':domain')
     implementation project(':core')

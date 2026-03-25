@@ -63,6 +63,52 @@ public class EventService {
     // ── 이벤트 탐지 실행 ─────────────────────────────────────────────────
 
     @Transactional
+    public int detectEventsForRange(LocalDate from, LocalDate to) {
+        int totalCreated = 0;
+        for (LocalDate date = from; !date.isAfter(to); date = date.plusDays(1)) {
+            List<Stock> activeStocks = stockRepository.findByStatus(Status.ACTIVE);
+            int created = 0;
+            for (Stock stock : activeStocks) {
+                try {
+                    StockPrice curr = stockPriceRepository
+                            .findByStockIdAndTradingDate(stock.getId(), date)
+                            .orElse(null);
+                    if (curr == null) continue;
+
+                    List<StockPrice> prevList = stockPriceRepository
+                            .findRecentPricesBeforeDate(stock.getId(), date, PageRequest.of(0, 1));
+                    if (prevList.isEmpty()) continue;
+
+                    StockPrice prev = prevList.get(0);
+                    BigDecimal changePct = calculateChangePct(prev.getClosePrice(), curr.getClosePrice());
+                    EventType eventType = resolveEventType(changePct);
+                    if (eventType == null) continue;
+
+                    if (!isVolumeConditionMet(stock.getId(), date, curr.getVolume())) continue;
+
+                    if (!eventRepository.existsByStockIdAndStartDate(stock.getId(), date)) {
+                        Event event = Event.create(stock, eventType, date, date,
+                                changePct, prev.getClosePrice(), curr.getClosePrice());
+                        eventRepository.save(event);
+                        log.info("[EventDetect] 저장 — ticker={}, type={}, date={}, changePct={}%",
+                                stock.getTicker(), eventType, date, changePct);
+                        created++;
+                    }
+                } catch (Exception e) {
+                    log.warn("[EventDetect] 처리 오류 — ticker={}, date={}, msg={}",
+                            stock.getTicker(), date, e.getMessage());
+                }
+            }
+            if (created > 0) {
+                log.info("[EventDetect] 탐지 완료 — date={}, 생성={}개", date, created);
+            }
+            totalCreated += created;
+        }
+        log.info("[EventDetect] 기간 탐지 완료 — {} ~ {}, 총 생성={}개", from, to, totalCreated);
+        return totalCreated;
+    }
+
+    @Transactional
     public void detectEvents(LocalDate targetDate) {
         List<Stock> activeStocks = stockRepository.findByStatus(Status.ACTIVE);
         log.info("[EventDetect] 탐지 시작 — date={}, 종목수={}개", targetDate, activeStocks.size());
