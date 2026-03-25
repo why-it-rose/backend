@@ -21,6 +21,9 @@ public class SecurityConfig {
     private final CustomOAuth2UserService customOAuth2UserService;
     private final OAuth2AuthenticationSuccessHandler oAuth2AuthenticationSuccessHandler;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final SecurityAuthenticationEntryPoint securityAuthenticationEntryPoint;
+    private final SecurityAccessDeniedHandler securityAccessDeniedHandler;
+
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -37,6 +40,10 @@ public class SecurityConfig {
                                 "/v3/api-docs/**"
                                 ).permitAll()
                         .anyRequest().authenticated()
+                )
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint(securityAuthenticationEntryPoint)
+                        .accessDeniedHandler(securityAccessDeniedHandler)
                 )
                 .oauth2Login(oauth2 -> oauth2
                         .userInfoEndpoint(userInfo -> userInfo
