@@ -12,8 +12,18 @@ public class LsOpenApiProperties {
     /** 예: https://openapi.ls-sec.co.kr:8080 */
     private String baseUrl = "https://openapi.ls-sec.co.kr:8080";
 
-    /** Bearer 토큰 (OAuth 발급값). 환경변수로 주입 권장. */
+    /** OAuth2 앱 키. LS OpenAPI 콘솔에서 발급. 환경변수 LS_APP_KEY 권장. */
+    private String appKey = "";
+
+    /** OAuth2 앱 시크릿. LS OpenAPI 콘솔에서 발급. 환경변수 LS_APP_SECRET 권장. */
+    private String appSecret = "";
+
+    /**
+     * Bearer 토큰 직접 주입 (레거시). appKey+appSecret이 설정되면 자동 발급으로 대체됨.
+     * 환경변수 LS_ACCESS_TOKEN.
+     */
     private String accessToken = "";
+
     private String seedResource = "classpath:seed/index-universe.json";
 
     /** t9945 등 마스터 연속조회 시 요청 간 최소 간격(ms). (LS: 초당 2건 등) */
