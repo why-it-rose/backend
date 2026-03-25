@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.OptionalDouble;
 
 @Slf4j
 @Service
@@ -178,12 +179,18 @@ public class EventService {
 
         if (recentPrices.isEmpty()) return false;
 
-        double avgVolume = recentPrices.stream()
+        // 거래정지일(volume = 0) 제외 후 평균 계산
+        OptionalDouble avgVolumeOpt = recentPrices.stream()
+                .filter(sp -> sp.getVolume() > 0)
                 .mapToLong(StockPrice::getVolume)
-                .average()
-                .orElse(0);
+                .average();
 
-        return currentVolume >= avgVolume * VOLUME_RATIO;
+        if (avgVolumeOpt.isEmpty() || avgVolumeOpt.getAsDouble() == 0) {
+            log.debug("[EventDetect] 거래량 평균 계산 불가 — stockId={}, date={}", stockId, targetDate);
+            return false;
+        }
+
+        return currentVolume >= avgVolumeOpt.getAsDouble() * VOLUME_RATIO;
     }
 
     // ── 이벤트 저장 (중복 방지) ──────────────────────────────────────────
