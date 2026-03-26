@@ -1,6 +1,7 @@
 package com.whyitrose.apiserver.auth.controller;
 
 import com.whyitrose.apiserver.auth.cookie.AuthCookieUtil;
+import com.whyitrose.apiserver.auth.dto.AuthResult;
 import com.whyitrose.apiserver.auth.dto.LoginRequest;
 import com.whyitrose.apiserver.auth.dto.LoginResponse;
 import com.whyitrose.apiserver.auth.dto.SignupRequest;
@@ -32,7 +33,7 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<BaseResponse<LoginResponse>> login(@RequestBody @Valid LoginRequest request) {
-        LoginResponse result = authService.login(request);
+        AuthResult result = authService.login(request);
         return withAuthCookies(result);
     }
 
@@ -40,7 +41,7 @@ public class AuthController {
     public ResponseEntity<BaseResponse<LoginResponse>> refresh(
             @CookieValue(name = AuthCookieUtil.REFRESH_TOKEN_COOKIE_NAME, required = false) String refreshToken
     ) {
-        LoginResponse result = authService.refresh(refreshToken);
+        AuthResult result = authService.refresh(refreshToken);
         return withAuthCookies(result);
     }
 
@@ -57,12 +58,13 @@ public class AuthController {
                 .header(HttpHeaders.SET_COOKIE, authCookieUtil.clearRefreshTokenCookie().toString())
                 .body(BaseResponse.success("로그아웃 되었습니다."));
     }
-    // 로그인 성공 시 at, rt를 set-cookie 헤더로 내려줌
-    private ResponseEntity<BaseResponse<LoginResponse>> withAuthCookies(LoginResponse result) {
+
+    // 로그인/리프레시 성공 시 토큰은 쿠키로만 전달하고, 바디에는 사용자 정보만 반환
+    private ResponseEntity<BaseResponse<LoginResponse>> withAuthCookies(AuthResult result) {
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, authCookieUtil.createAccessTokenCookie(result.accessToken()).toString())
                 .header(HttpHeaders.SET_COOKIE, authCookieUtil.createRefreshTokenCookie(result.refreshToken()).toString())
-                .body(BaseResponse.success(result));
+                .body(BaseResponse.success(result.toLoginResponse()));
     }
 
     private Long extractPrincipalUserId(Authentication authentication) {

@@ -1,7 +1,7 @@
 package com.whyitrose.apiserver.auth.service;
 
+import com.whyitrose.apiserver.auth.dto.AuthResult;
 import com.whyitrose.apiserver.auth.dto.LoginRequest;
-import com.whyitrose.apiserver.auth.dto.LoginResponse;
 import com.whyitrose.apiserver.auth.dto.SignupRequest;
 import com.whyitrose.apiserver.auth.dto.UserResponse;
 import com.whyitrose.apiserver.auth.exception.AuthErrorCode;
@@ -56,7 +56,7 @@ public class AuthService {
         return UserResponse.from(userRepository.save(user));
     }
 
-    public LoginResponse login(LoginRequest request) {
+    public AuthResult login(LoginRequest request) {
         String email = normalizeEmail(request.email());
 
         User user = userRepository.findByEmail(email)
@@ -70,13 +70,13 @@ public class AuthService {
             throw new BaseException(AuthErrorCode.AUTH_011);
         }
 
-        LoginResponse result = toLoginResponse(user);
+        AuthResult result = toAuthResult(user);
         upsertRefreshToken(user, result.refreshToken());
         return result;
     }
 
     // refresh 토큰은 DB 저장값과 일치 여부만 검증하고, access만 새 발급
-    public LoginResponse refresh(String refreshToken) {
+    public AuthResult refresh(String refreshToken) {
         if (!StringUtils.hasText(refreshToken)) {
             throw new BaseException(BaseResponseStatus.INVALID_TOKEN);
         }
@@ -115,7 +115,7 @@ public class AuthService {
 
         String newAccessToken = jwtTokenProvider.createAccessToken(user.getId());
 
-        return new LoginResponse(
+        return new AuthResult(
                 user.getId(),
                 user.getEmail(),
                 user.getNickname(),
@@ -158,11 +158,11 @@ public class AuthService {
         saved.update(refreshTokenValue, expiryAt);
     }
 
-    private LoginResponse toLoginResponse(User user) {
+    private AuthResult toAuthResult(User user) {
         String accessToken = jwtTokenProvider.createAccessToken(user.getId());
         String refreshToken = jwtTokenProvider.createRefreshToken(user.getId());
 
-        return new LoginResponse(
+        return new AuthResult(
                 user.getId(),
                 user.getEmail(),
                 user.getNickname(),
