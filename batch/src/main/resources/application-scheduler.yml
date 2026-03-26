@@ -1,0 +1,11 @@
+spring:
+  batch:
+    job:
+      enabled: false  # 시작 시 자동 실행 안 함, 스케줄러가 제어
+
+stock:
+  price:
+    days-back: 1
+    scheduler:
+      enabled: true
+    daily-cron: "0 26 10 * * MON-FRI"
