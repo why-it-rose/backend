@@ -11,6 +11,8 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     // idx_notifications_user_date 활용
     List<Notification> findByUserIdAndStatusOrderByCreatedAtDesc(Long userId, Status status, Pageable pageable);
 
+    boolean existsByDigestId(Long digestId);
+
     // 안읽은 알림 수
     long countByUserIdAndReadAtIsNullAndStatus(Long userId, Status status);
 }
