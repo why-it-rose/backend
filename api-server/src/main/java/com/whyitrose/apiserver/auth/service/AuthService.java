@@ -2,6 +2,7 @@ package com.whyitrose.apiserver.auth.service;
 
 import com.whyitrose.apiserver.auth.dto.AuthResult;
 import com.whyitrose.apiserver.auth.dto.LoginRequest;
+import com.whyitrose.apiserver.auth.dto.LoginResponse;
 import com.whyitrose.apiserver.auth.dto.SignupRequest;
 import com.whyitrose.apiserver.auth.dto.UserResponse;
 import com.whyitrose.apiserver.auth.exception.AuthErrorCode;
@@ -143,6 +144,22 @@ public class AuthService {
         } catch (JwtException | IllegalArgumentException ignored) {
             // 쿠키는 어차피 만료시킬 것이므로 무시
         }
+    }
+
+    @Transactional(readOnly = true)
+    public LoginResponse getMe(Long authenticatedUserId) {
+        if (authenticatedUserId == null) {
+            throw new BaseException(BaseResponseStatus.UNAUTHORIZED_ACCESS);
+        }
+
+        User user = userRepository.findById(authenticatedUserId)
+                .orElseThrow(() -> new BaseException(BaseResponseStatus.INVALID_TOKEN));
+
+        if (user.getStatus() == Status.DELETED) {
+            throw new BaseException(AuthErrorCode.AUTH_013);
+        }
+
+        return new LoginResponse(user.getId(), user.getEmail(), user.getNickname());
     }
 
     private void upsertRefreshToken(User user, String refreshTokenValue) {

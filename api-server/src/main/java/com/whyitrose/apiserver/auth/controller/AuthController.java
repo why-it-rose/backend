@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/auth")
 public class AuthController {
 
+    private static final String NO_STORE_CACHE_CONTROL = "no-store, no-cache, must-revalidate, max-age=0";
     private final AuthService authService;
     private final AuthCookieUtil authCookieUtil;
 
@@ -59,11 +60,24 @@ public class AuthController {
                 .body(BaseResponse.success("로그아웃 되었습니다."));
     }
 
+    @GetMapping("/me")
+    public ResponseEntity<BaseResponse<LoginResponse>> me(Authentication authentication) {
+        Long userId = extractPrincipalUserId(authentication);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CACHE_CONTROL, NO_STORE_CACHE_CONTROL)
+                .header("Pragma", "no-cache")
+                .header("Expires", "0")
+                .body(BaseResponse.success(authService.getMe(userId)));
+    }
+
     // 로그인/리프레시 성공 시 토큰은 쿠키로만 전달하고, 바디에는 사용자 정보만 반환
     private ResponseEntity<BaseResponse<LoginResponse>> withAuthCookies(AuthResult result) {
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, authCookieUtil.createAccessTokenCookie(result.accessToken()).toString())
                 .header(HttpHeaders.SET_COOKIE, authCookieUtil.createRefreshTokenCookie(result.refreshToken()).toString())
+                .header(HttpHeaders.CACHE_CONTROL, NO_STORE_CACHE_CONTROL)
+                .header("Pragma", "no-cache")
+                .header("Expires", "0")
                 .body(BaseResponse.success(result.toLoginResponse()));
     }
 
