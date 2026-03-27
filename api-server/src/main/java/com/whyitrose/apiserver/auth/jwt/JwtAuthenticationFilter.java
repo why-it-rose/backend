@@ -1,12 +1,14 @@
 package com.whyitrose.apiserver.auth.jwt;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.whyitrose.apiserver.auth.cookie.AuthCookieUtil;
 import com.whyitrose.core.response.BaseResponse;
 import com.whyitrose.core.response.BaseResponseStatus;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -30,22 +32,28 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final ObjectMapper objectMapper;
 
     @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        return path.startsWith("/auth/signup")
+                || path.startsWith("/auth/login")
+                || path.startsWith("/auth/refresh")
+                || path.startsWith("/auth/logout")
+                || path.startsWith("/swagger-ui")
+                || path.startsWith("/v3/api-docs")
+                || path.startsWith("/actuator/health");
+    }
+
+    @Override
     protected void doFilterInternal(
             HttpServletRequest request,
             HttpServletResponse response,
             FilterChain filterChain
     ) throws ServletException, IOException {
 
-        String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
+        String token = resolveAccessToken(request);
 
-        if (!StringUtils.hasText(authHeader) || !authHeader.startsWith("Bearer ")) {
-            filterChain.doFilter(request, response);
-            return;
-        }
-
-        String token = authHeader.substring(7).trim();
         if (!StringUtils.hasText(token)) {
-            writeError(response, BaseResponseStatus.INVALID_ACCESS_TOKEN);
+            filterChain.doFilter(request, response);
             return;
         }
 
@@ -59,7 +67,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             UsernamePasswordAuthenticationToken authentication =
                     new UsernamePasswordAuthenticationToken(
-                            claims.userId(),   // principal
+                            claims.userId(),
                             null,
                             Collections.emptyList()
                     );
@@ -73,6 +81,31 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         } catch (JwtException | IllegalArgumentException e) {
             writeError(response, BaseResponseStatus.INVALID_TOKEN);
         }
+    }
+
+    // 우선순위: Authorization 헤더 -> 쿠키
+    private String resolveAccessToken(HttpServletRequest request) {
+        String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
+
+        if (StringUtils.hasText(authHeader)) {
+            if (!authHeader.startsWith("Bearer ")) {
+                return "";
+            }
+            return authHeader.substring(7).trim();
+        }
+
+        Cookie[] cookies = request.getCookies();
+        if (cookies == null) {
+            return null;
+        }
+
+        for (Cookie cookie : cookies) {
+            if (AuthCookieUtil.ACCESS_TOKEN_COOKIE_NAME.equals(cookie.getName())) {
+                return cookie.getValue();
+            }
+        }
+
+        return null;
     }
 
     private void writeError(HttpServletResponse response, BaseResponseStatus status) throws IOException {
