@@ -1,6 +1,7 @@
 package com.whyitrose.apiserver.event.controller;
 
 import com.whyitrose.apiserver.event.dto.EventDetailResponse;
+import com.whyitrose.apiserver.event.dto.EventDetectRangeRequest;
 import com.whyitrose.apiserver.event.dto.EventDetectRequest;
 import com.whyitrose.apiserver.event.dto.EventResponse;
 import com.whyitrose.apiserver.event.service.EventService;
@@ -180,5 +181,15 @@ public class EventController {
     public ResponseEntity<BaseResponse<Void>> detect(@RequestBody @Valid EventDetectRequest request) {
         eventService.detectEvents(request.targetDate());
         return ResponseEntity.ok(BaseResponse.success(null));
+    }
+
+    @Operation(
+            summary = "기간 이벤트 탐지 실행 (디버깅용)",
+            description = "from ~ to 구간의 모든 날짜에 대해 급등/급락 이벤트를 탐지합니다. 주가 데이터가 없는 날(주말·공휴일)은 자동으로 스킵됩니다."
+    )
+    @PostMapping("/detect/range")
+    public ResponseEntity<BaseResponse<Integer>> detectRange(@RequestBody @Valid EventDetectRangeRequest request) {
+        int totalCreated = eventService.detectEventsForRange(request.from(), request.to());
+        return ResponseEntity.ok(BaseResponse.success(totalCreated));
     }
 }

@@ -29,4 +29,16 @@ public interface EventRepository extends JpaRepository<Event, Long> {
 
     // 동일 stock_id + start_date 중복 여부 확인
     boolean existsByStockIdAndStartDate(Long stockId, LocalDate startDate);
+
+    // 병합 대상 이벤트 조회
+    // 같은 종목 + 같은 EventType + PENDING + endDate = 직전 거래일 + 거래일 수 3일 미만
+    @Query("SELECT e FROM Event e " +
+           "WHERE e.stock.id = :stockId " +
+           "AND e.eventType = :eventType " +
+           "AND e.status = com.whyitrose.domain.common.Status.PENDING " +
+           "AND e.endDate = :prevTradingDate " +
+           "AND e.tradingDaysCount < 3")
+    Optional<Event> findMergeable(@Param("stockId") Long stockId,
+                                  @Param("eventType") EventType eventType,
+                                  @Param("prevTradingDate") LocalDate prevTradingDate);
 }
