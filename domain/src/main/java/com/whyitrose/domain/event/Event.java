@@ -59,6 +59,10 @@ public class Event extends BaseTimeEntity {
     @Column(name = "price_after", nullable = false)
     private int priceAfter;
 
+    // 병합된 거래일 수 (단일 이벤트 = 1, 최대 3)
+    @Column(name = "trading_days_count", nullable = false)
+    private int tradingDaysCount;
+
     // AI 요약 1~3문장
     @Column(name = "summary", columnDefinition = "TEXT")
     private String summary;
@@ -87,6 +91,7 @@ public class Event extends BaseTimeEntity {
         event.changePct = changePct;
         event.priceBefore = priceBefore;
         event.priceAfter = priceAfter;
+        event.tradingDaysCount = 1;
         event.status = Status.PENDING;
         return event;
     }
@@ -100,6 +105,14 @@ public class Event extends BaseTimeEntity {
     public void activate(String summary) {
         this.summary = summary;
         this.status = Status.ACTIVE;
+    }
+
+    // 이벤트 병합 — endDate, priceAfter, changePct, tradingDaysCount 업데이트
+    public void extend(LocalDate newEndDate, int newPriceAfter, BigDecimal newChangePct) {
+        this.endDate = newEndDate;
+        this.priceAfter = newPriceAfter;
+        this.changePct = newChangePct;
+        this.tradingDaysCount++;
     }
 
     public void delete() {

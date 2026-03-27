@@ -22,6 +22,8 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
+import java.util.OptionalDouble;
 
 @Slf4j
 @Service
@@ -31,6 +33,7 @@ public class EventService {
 
     private static final BigDecimal SURGE_THRESHOLD      = new BigDecimal("5.00");
     private static final BigDecimal DROP_THRESHOLD       = new BigDecimal("-5.00");
+    private static final BigDecimal MAX_CHANGE_THRESHOLD = new BigDecimal("30.00"); // 권리락/액면분할 필터
     private static final int        VOLUME_LOOKBACK_DAYS = 20;
     private static final double     VOLUME_RATIO         = 1.5;
 
@@ -63,6 +66,26 @@ public class EventService {
     // ── 이벤트 탐지 실행 ─────────────────────────────────────────────────
 
     @Transactional
+    public int detectEventsForRange(LocalDate from, LocalDate to) {
+        int totalCreated = 0;
+        for (LocalDate date = from; !date.isAfter(to); date = date.plusDays(1)) {
+            List<Stock> activeStocks = stockRepository.findByStatus(Status.ACTIVE);
+            for (Stock stock : activeStocks) {
+                try {
+                    if (detectForStock(stock, date)) {
+                        totalCreated++;
+                    }
+                } catch (Exception e) {
+                    log.warn("[EventDetect] 처리 오류 — ticker={}, date={}, msg={}",
+                            stock.getTicker(), date, e.getMessage());
+                }
+            }
+        }
+        log.info("[EventDetect] 기간 탐지 완료 — {} ~ {}, 총 생성/병합={}건", from, to, totalCreated);
+        return totalCreated;
+    }
+
+    @Transactional
     public void detectEvents(LocalDate targetDate) {
         List<Stock> activeStocks = stockRepository.findByStatus(Status.ACTIVE);
         log.info("[EventDetect] 탐지 시작 — date={}, 종목수={}개", targetDate, activeStocks.size());
@@ -80,31 +103,79 @@ public class EventService {
 
     // ── 종목별 탐지 ─────────────────────────────────────────────────────
 
-    private void detectForStock(Stock stock, LocalDate targetDate) {
+    private boolean detectForStock(Stock stock, LocalDate targetDate) {
         StockPrice curr = stockPriceRepository
                 .findByStockIdAndTradingDate(stock.getId(), targetDate)
                 .orElse(null);
 
-        if (curr == null) return;
+        if (curr == null) return false;
 
         List<StockPrice> prevList = stockPriceRepository
                 .findRecentPricesBeforeDate(stock.getId(), targetDate, PageRequest.of(0, 1));
 
-        if (prevList.isEmpty()) return;
+        if (prevList.isEmpty()) return false;
 
         StockPrice prev = prevList.get(0);
-
         BigDecimal changePct = calculateChangePct(prev.getClosePrice(), curr.getClosePrice());
-        EventType eventType = resolveEventType(changePct);
 
-        if (eventType == null) return;
+        // 권리락/액면분할 필터 — ±30% 초과는 이벤트로 보지 않음
+        if (changePct.abs().compareTo(MAX_CHANGE_THRESHOLD) > 0) {
+            log.debug("[EventDetect] 변동률 초과 (권리락/분할 의심) — ticker={}, date={}, changePct={}%",
+                    stock.getTicker(), targetDate, changePct);
+            return false;
+        }
+
+        EventType eventType = resolveEventType(changePct);
+        if (eventType == null) return false;
 
         if (!isVolumeConditionMet(stock.getId(), targetDate, curr.getVolume())) {
             log.debug("[EventDetect] 거래량 미충족 — ticker={}, date={}", stock.getTicker(), targetDate);
-            return;
+            return false;
         }
 
-        saveEvent(stock, eventType, targetDate, prev.getClosePrice(), curr.getClosePrice(), changePct);
+        return saveOrMergeEvent(stock, eventType, targetDate, prev.getClosePrice(), curr.getClosePrice(), changePct);
+    }
+
+    // ── 이벤트 저장 또는 병합 ────────────────────────────────────────────
+
+    private boolean saveOrMergeEvent(Stock stock, EventType eventType,
+                                     LocalDate targetDate, int priceBefore, int priceAfter,
+                                     BigDecimal changePct) {
+        // 직전 거래일 조회
+        Optional<LocalDate> prevTradingDate = stockPriceRepository
+                .findRecentPricesBeforeDate(stock.getId(), targetDate, PageRequest.of(0, 1))
+                .stream()
+                .map(StockPrice::getTradingDate)
+                .findFirst();
+
+        // 병합 대상 이벤트 조회
+        Optional<Event> mergeable = prevTradingDate.flatMap(prevDate ->
+                eventRepository.findMergeable(stock.getId(), eventType, prevDate));
+
+        if (mergeable.isPresent()) {
+            Event event = mergeable.get();
+            BigDecimal mergedChangePct = calculateChangePct(event.getPriceBefore(), priceAfter);
+            event.extend(targetDate, priceAfter, mergedChangePct);
+
+            log.info("[EventDetect] 이벤트 병합 — ticker={}, type={}, startDate={}, endDate={}, changePct={}%",
+                    stock.getTicker(), eventType, event.getStartDate(), targetDate, mergedChangePct);
+            return true;
+        }
+
+        // 중복 방지
+        if (eventRepository.existsByStockIdAndStartDate(stock.getId(), targetDate)) {
+            log.debug("[EventDetect] 중복 이벤트 — ticker={}, date={}", stock.getTicker(), targetDate);
+            return false;
+        }
+
+        // 신규 이벤트 생성
+        Event event = Event.create(stock, eventType, targetDate, targetDate,
+                changePct, priceBefore, priceAfter);
+        eventRepository.save(event);
+
+        log.info("[EventDetect] 이벤트 저장 — ticker={}, type={}, date={}, changePct={}%",
+                stock.getTicker(), eventType, targetDate, changePct);
+        return true;
     }
 
     // ── 변동률 계산 ──────────────────────────────────────────────────────
@@ -132,31 +203,17 @@ public class EventService {
 
         if (recentPrices.isEmpty()) return false;
 
-        double avgVolume = recentPrices.stream()
+        // 거래정지일(volume = 0) 제외 후 평균 계산
+        OptionalDouble avgVolumeOpt = recentPrices.stream()
+                .filter(sp -> sp.getVolume() > 0)
                 .mapToLong(StockPrice::getVolume)
-                .average()
-                .orElse(0);
+                .average();
 
-        return currentVolume >= avgVolume * VOLUME_RATIO;
-    }
-
-    // ── 이벤트 저장 (중복 방지) ──────────────────────────────────────────
-
-    @Transactional
-    protected void saveEvent(Stock stock, EventType eventType,
-                             LocalDate targetDate, int priceBefore, int priceAfter,
-                             BigDecimal changePct) {
-
-        if (eventRepository.existsByStockIdAndStartDate(stock.getId(), targetDate)) {
-            log.debug("[EventDetect] 중복 이벤트 — ticker={}, date={}", stock.getTicker(), targetDate);
-            return;
+        if (avgVolumeOpt.isEmpty() || avgVolumeOpt.getAsDouble() == 0) {
+            log.debug("[EventDetect] 거래량 평균 계산 불가 — stockId={}, date={}", stockId, targetDate);
+            return false;
         }
 
-        Event event = Event.create(stock, eventType, targetDate, targetDate,
-                changePct, priceBefore, priceAfter);
-        eventRepository.save(event);
-
-        log.info("[EventDetect] 저장 — ticker={}, type={}, date={}, changePct={}%",
-                stock.getTicker(), eventType, targetDate, changePct);
+        return currentVolume >= avgVolumeOpt.getAsDouble() * VOLUME_RATIO;
     }
 }

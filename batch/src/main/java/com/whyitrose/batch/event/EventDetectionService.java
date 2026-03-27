@@ -1,8 +1,6 @@
 package com.whyitrose.batch.event;
 
 import com.whyitrose.domain.common.Status;
-import com.whyitrose.domain.event.Event;
-import com.whyitrose.domain.event.EventRepository;
 import com.whyitrose.domain.event.EventType;
 import com.whyitrose.domain.stock.Stock;
 import com.whyitrose.domain.stock.StockPrice;
@@ -18,6 +16,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.OptionalDouble;
 
 @Slf4j
 @Service
@@ -35,7 +34,7 @@ public class EventDetectionService {
 
     private final StockRepository      stockRepository;
     private final StockPriceRepository stockPriceRepository;
-    private final EventRepository      eventRepository;
+    private final EventSaveService     eventSaveService;
 
     /**
      * targetDate 하루치 전체 ACTIVE 종목에 대해 이벤트 탐지 실행
@@ -99,7 +98,7 @@ public class EventDetectionService {
         }
 
         // ④ 이벤트 저장
-        return saveEvent(stock, eventType, targetDate, prev.getClosePrice(), curr.getClosePrice(), changePct);
+        return eventSaveService.saveEvent(stock, eventType, targetDate, prev.getClosePrice(), curr.getClosePrice(), changePct);
     }
 
     // ── 변동률 계산 ───────────────────────────────────────────────────
@@ -130,33 +129,16 @@ public class EventDetectionService {
             return false;
         }
 
-        double avgVolume = recentPrices.stream()
+        OptionalDouble avgVolumeOpt = recentPrices.stream()
                 .mapToLong(StockPrice::getVolume)
-                .average()
-                .orElse(0);
+                .average();
 
-        return currentVolume >= avgVolume * VOLUME_RATIO_THRESHOLD;
-    }
-
-    // ── 이벤트 저장 (중복 방지 포함) ─────────────────────────────────
-
-    @Transactional
-    protected boolean saveEvent(Stock stock, EventType eventType,
-                             LocalDate targetDate, int priceBefore, int priceAfter,
-                             BigDecimal changePct) {
-
-        // 동일 stock_id + start_date 중복 방지
-        if (eventRepository.existsByStockIdAndStartDate(stock.getId(), targetDate)) {
-            log.debug("[EventDetection] 이미 존재하는 이벤트 — ticker={}, date={}", stock.getTicker(), targetDate);
+        if (avgVolumeOpt.isEmpty() || avgVolumeOpt.getAsDouble() == 0) {
+            log.debug("[EventDetection] 거래량 평균 계산 불가 — stockId={}, date={}", stockId, targetDate);
             return false;
         }
 
-        Event event = Event.create(stock, eventType, targetDate, targetDate,
-                changePct, priceBefore, priceAfter);
-        eventRepository.save(event);
-
-        log.info("[EventDetection] 이벤트 저장 — ticker={}, type={}, date={}, changePct={}%",
-                stock.getTicker(), eventType, targetDate, changePct);
-        return true;
+        return currentVolume >= avgVolumeOpt.getAsDouble() * VOLUME_RATIO_THRESHOLD;
     }
+
 }
