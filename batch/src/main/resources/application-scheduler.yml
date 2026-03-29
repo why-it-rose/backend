@@ -13,4 +13,4 @@ stock:
 notification:
   scheduler:
     enabled: true
-    cron: "0 16 13 * * *"  # 테스트용, 운영 시 제거하면 기본값 0 0 8 * * * 적용
+    cron: "0 19 15 * * *"  # 테스트용, 운영 시 제거하면 기본값 0 0 8 * * * 적용

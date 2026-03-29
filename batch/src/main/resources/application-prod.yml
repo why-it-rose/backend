@@ -8,3 +8,6 @@ spring:
     hibernate:
       ddl-auto: validate
     show-sql: false
+
+fcm:
+  key-json: ${FCM_KEY_JSON}
