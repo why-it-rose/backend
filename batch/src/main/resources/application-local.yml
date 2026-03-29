@@ -11,6 +11,9 @@ spring:
     properties:
       hibernate:
         format_sql: true
+fcm:
+  key-json: ${FCM_KEY_JSON}
+
 logging:
   level:
     com.whyitrose.batch.event: DEBUG

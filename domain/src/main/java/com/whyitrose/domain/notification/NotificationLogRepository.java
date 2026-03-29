@@ -8,6 +8,8 @@ import java.util.Optional;
 
 public interface NotificationLogRepository extends JpaRepository<NotificationLog, Long> {
 
+    boolean existsByNotification_DigestId(Long digestId);
+
     // idx_notification_logs_status 활용 — 재시도 대상 조회
     List<NotificationLog> findByNotificationIdAndStatus(Long notificationId, Status status);
 
