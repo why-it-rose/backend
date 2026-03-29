@@ -2,6 +2,7 @@ package com.whyitrose.apiserver.event.service;
 
 import com.whyitrose.apiserver.event.dto.EventDetailResponse;
 import com.whyitrose.apiserver.event.dto.EventResponse;
+import com.whyitrose.apiserver.event.dto.StockLatestEventResponse;
 import com.whyitrose.apiserver.event.exception.EventErrorCode;
 import com.whyitrose.core.exception.BaseException;
 import com.whyitrose.domain.common.Status;
@@ -51,6 +52,15 @@ public class EventService {
 
         return events.stream()
                 .map(EventResponse::from)
+                .toList();
+    }
+
+    // ── 종목 목록의 최신 이벤트 조회 ──────────────────────────────────────
+
+    public List<StockLatestEventResponse> getLatestEventsByStockIds(List<Long> stockIds) {
+        return eventRepository.findLatestByStockIds(stockIds, Status.ACTIVE)
+                .stream()
+                .map(StockLatestEventResponse::from)
                 .toList();
     }
 

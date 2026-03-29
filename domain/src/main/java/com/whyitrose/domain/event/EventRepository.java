@@ -41,4 +41,12 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     Optional<Event> findMergeable(@Param("stockId") Long stockId,
                                   @Param("eventType") EventType eventType,
                                   @Param("prevTradingDate") LocalDate prevTradingDate);
+
+    // 여러 종목의 최신 이벤트 조회 (종목 목록 화면용)
+    @Query("SELECT e FROM Event e " +
+           "WHERE e.stock.id IN :stockIds " +
+           "AND e.status = :status " +
+           "AND e.endDate = (SELECT MAX(e2.endDate) FROM Event e2 WHERE e2.stock.id = e.stock.id AND e2.status = :status)")
+    List<Event> findLatestByStockIds(@Param("stockIds") List<Long> stockIds,
+                                     @Param("status") Status status);
 }
