@@ -18,7 +18,7 @@ public record UserResponse(
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {
-    // Entity를 DTO로 변
+    // Entity를 DTO로 변환
     public static UserResponse from(User user) {
         return new UserResponse(
                 user.getId(),

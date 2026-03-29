@@ -8,6 +8,8 @@ import java.util.Optional;
 
 public interface DailyNewsDigestRepository extends JpaRepository<DailyNewsDigest, Long> {
 
+    boolean existsByDigestDate(LocalDate digestDate);
+
     Optional<DailyNewsDigest> findByDigestDate(LocalDate digestDate);
 
     Optional<DailyNewsDigest> findByDigestDateAndStatus(LocalDate digestDate, Status status);
