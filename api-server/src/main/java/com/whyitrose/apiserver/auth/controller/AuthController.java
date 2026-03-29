@@ -15,6 +15,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import com.whyitrose.apiserver.auth.dto.UpdateMeRequest;
 
 @RestController
 @RequiredArgsConstructor
@@ -68,6 +69,15 @@ public class AuthController {
                 .header("Pragma", "no-cache")
                 .header("Expires", "0")
                 .body(BaseResponse.success(authService.getMe(userId)));
+    }
+
+    @PatchMapping("/me")
+    public ResponseEntity<BaseResponse<UserResponse>> updateMe(
+            Authentication authentication,
+            @RequestBody @Valid UpdateMeRequest request
+    ) {
+        Long userId = extractPrincipalUserId(authentication);
+        return ResponseEntity.ok(BaseResponse.success(authService.updateMe(userId, request)));
     }
 
     // 로그인/리프레시 성공 시 토큰은 쿠키로만 전달하고, 바디에는 사용자 정보만 반환

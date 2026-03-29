@@ -23,6 +23,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import com.whyitrose.apiserver.auth.dto.UpdateMeRequest;
 
 import java.time.LocalDateTime;
 
@@ -160,6 +161,27 @@ public class AuthService {
         }
 
         return new LoginResponse(user.getId(), user.getEmail(), user.getNickname());
+    }
+
+    public UserResponse updateMe(Long authenticatedUserId, UpdateMeRequest request) {
+        if (authenticatedUserId == null) {
+            throw new BaseException(BaseResponseStatus.UNAUTHORIZED_ACCESS);
+        }
+
+        User user = userRepository.findById(authenticatedUserId)
+                .orElseThrow(() -> new BaseException(BaseResponseStatus.INVALID_TOKEN));
+
+        if (user.getStatus() == Status.DELETED) {
+            throw new BaseException(AuthErrorCode.AUTH_013);
+        }
+
+        String nickname = request.nickname().trim();
+        if (userRepository.existsByNicknameAndIdNot(nickname, user.getId())) {
+            throw new BaseException(AuthErrorCode.AUTH_010);
+        }
+
+        user.updateNickname(nickname);
+        return UserResponse.from(user);
     }
 
     private void upsertRefreshToken(User user, String refreshTokenValue) {
