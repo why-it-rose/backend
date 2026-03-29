@@ -4,6 +4,7 @@ import com.whyitrose.apiserver.event.dto.EventDetailResponse;
 import com.whyitrose.apiserver.event.dto.EventDetectRangeRequest;
 import com.whyitrose.apiserver.event.dto.EventDetectRequest;
 import com.whyitrose.apiserver.event.dto.EventResponse;
+import com.whyitrose.apiserver.event.dto.StockLatestEventResponse;
 import com.whyitrose.apiserver.event.service.EventService;
 import com.whyitrose.core.response.BaseResponse;
 import com.whyitrose.domain.event.EventType;
@@ -145,6 +146,37 @@ public class EventController {
     @GetMapping("/{eventId}")
     public ResponseEntity<BaseResponse<EventDetailResponse>> getEventDetail(@PathVariable Long eventId) {
         return ResponseEntity.ok(BaseResponse.success(eventService.getEventDetail(eventId)));
+    }
+
+    @Operation(
+            summary = "종목 목록의 최신 이벤트 조회",
+            description = "여러 종목 ID를 받아 각 종목의 최신 급등/급락 이벤트를 반환합니다. 이벤트가 없는 종목은 결과에 포함되지 않습니다."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공",
+                    content = @Content(mediaType = "application/json", examples = @ExampleObject(value = """
+                            {
+                              "isSuccess": true,
+                              "responseCode": 1000,
+                              "responseMessage": "요청에 성공하였습니다.",
+                              "result": [
+                                {
+                                  "stockId": 10,
+                                  "eventId": 1,
+                                  "eventType": "SURGE",
+                                  "startDate": "2024-03-16",
+                                  "endDate": "2024-03-16",
+                                  "changePct": 12.35
+                                }
+                              ]
+                            }
+                            """)))
+    })
+    @GetMapping("/latest")
+    public ResponseEntity<BaseResponse<List<StockLatestEventResponse>>> getLatestEvents(
+            @RequestParam List<Long> stockIds
+    ) {
+        return ResponseEntity.ok(BaseResponse.success(eventService.getLatestEventsByStockIds(stockIds)));
     }
 
     @Operation(
