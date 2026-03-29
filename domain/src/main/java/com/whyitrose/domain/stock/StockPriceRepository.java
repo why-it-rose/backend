@@ -22,8 +22,26 @@ public interface StockPriceRepository extends JpaRepository<StockPrice, Long> {
     Optional<StockPrice> findByStockIdAndTradingDateAndPeriod(
             Long stockId, LocalDate tradingDate, StockPricePeriod period);
 
+    Optional<StockPrice> findTopByStockIdAndPeriodOrderByTradingDateDesc(
+            Long stockId, StockPricePeriod period);
+
+    List<StockPrice> findTop2ByStockIdAndPeriodOrderByTradingDateDesc(
+            Long stockId, StockPricePeriod period);
+
+    Optional<StockPrice> findTopByStockIdAndPeriodAndTradingDateLessThanEqualOrderByTradingDateDesc(
+            Long stockId, StockPricePeriod period, LocalDate tradingDate);
+
     List<StockPrice> findByStockIdAndTradingDateBetweenOrderByTradingDateAsc(
             Long stockId, LocalDate from, LocalDate to);
+
+    List<StockPrice> findByStockIdAndPeriodAndTradingDateBetweenOrderByTradingDateAsc(
+            Long stockId, StockPricePeriod period, LocalDate from, LocalDate to);
+
+    List<StockPrice> findByStockIdAndPeriodOrderByTradingDateDesc(
+            Long stockId, StockPricePeriod period, Pageable pageable);
+
+    List<StockPrice> findByStockIdAndPeriodOrderByTradingDateAsc(
+            Long stockId, StockPricePeriod period);
 
     // 특정 종목의 전체 주가를 날짜 오름차순 조회
     List<StockPrice> findByStockIdOrderByTradingDateAsc(Long stockId);

@@ -9,6 +9,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -17,7 +18,6 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.List;
 
 
-// TODO: 실제 인증/인가 로직으로 교체 필요
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
@@ -53,22 +53,26 @@ public class SecurityConfig {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                // 서버가 로그인 상태를 HttpSession에 저장하지 않음
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/auth/signup",
                                 "/auth/login",
+                                "/auth/logout",
                                 "/auth/refresh",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
-                                "/actuator/health"
+                                "/actuator/health",
+                                "/api/stocks/**"
                                 ).permitAll()
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint(securityAuthenticationEntryPoint)
                         .accessDeniedHandler(securityAccessDeniedHandler)
-                );
+                )
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
