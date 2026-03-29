@@ -80,6 +80,17 @@ public class AuthController {
         return ResponseEntity.ok(BaseResponse.success(authService.updateMe(userId, request)));
     }
 
+    @DeleteMapping("/me")
+    public ResponseEntity<BaseResponse<String>> deleteMe(Authentication authentication) {
+        Long userId = extractPrincipalUserId(authentication);
+        authService.deleteMe(userId);
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, authCookieUtil.clearAccessTokenCookie().toString())
+                .header(HttpHeaders.SET_COOKIE, authCookieUtil.clearRefreshTokenCookie().toString())
+                .body(BaseResponse.success("회원 탈퇴가 완료되었습니다."));
+    }
+
     // 로그인/리프레시 성공 시 토큰은 쿠키로만 전달하고, 바디에는 사용자 정보만 반환
     private ResponseEntity<BaseResponse<LoginResponse>> withAuthCookies(AuthResult result) {
         return ResponseEntity.ok()

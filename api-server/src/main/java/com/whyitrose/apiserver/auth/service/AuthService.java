@@ -184,6 +184,22 @@ public class AuthService {
         return UserResponse.from(user);
     }
 
+    public void deleteMe(Long authenticatedUserId) {
+        if (authenticatedUserId == null) {
+            throw new BaseException(BaseResponseStatus.UNAUTHORIZED_ACCESS);
+        }
+
+        User user = userRepository.findById(authenticatedUserId)
+                .orElseThrow(() -> new BaseException(BaseResponseStatus.INVALID_TOKEN));
+
+        if (user.getStatus() == Status.DELETED) {
+            throw new BaseException(AuthErrorCode.AUTH_013);
+        }
+
+        user.delete();
+        refreshTokenRepository.deleteByUserId(user.getId());
+    }
+
     private void upsertRefreshToken(User user, String refreshTokenValue) {
         LocalDateTime expiryAt = LocalDateTime.now()
                 .plusSeconds(jwtTokenProvider.getRefreshTokenExpirationMs() / 1000);
