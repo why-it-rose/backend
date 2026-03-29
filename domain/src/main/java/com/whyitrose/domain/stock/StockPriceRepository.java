@@ -40,6 +40,9 @@ public interface StockPriceRepository extends JpaRepository<StockPrice, Long> {
     List<StockPrice> findByStockIdAndPeriodOrderByTradingDateDesc(
             Long stockId, StockPricePeriod period, Pageable pageable);
 
+    List<StockPrice> findByStockIdAndPeriodOrderByTradingDateAsc(
+            Long stockId, StockPricePeriod period);
+
     // 특정 종목의 전체 주가를 날짜 오름차순 조회
     List<StockPrice> findByStockIdOrderByTradingDateAsc(Long stockId);
 

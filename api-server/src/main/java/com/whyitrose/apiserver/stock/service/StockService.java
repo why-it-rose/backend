@@ -177,12 +177,8 @@ public class StockService {
                 .orElseThrow(() -> new BaseException(StockErrorCode.STOCK_001));
         String key = normalizePeriod(period);
         StockPricePeriod mappedPeriod = resolvePricePeriod(key);
-        int fetchSize = resolveFetchSize(key);
-        List<StockPrice> desc = stockPriceRepository.findByStockIdAndPeriodOrderByTradingDateDesc(
-                stock.getId(), mappedPeriod, PageRequest.of(0, fetchSize));
-        List<StockPrice> prices = desc.stream()
-                .sorted(Comparator.comparing(StockPrice::getTradingDate))
-                .toList();
+        List<StockPrice> prices = stockPriceRepository.findByStockIdAndPeriodOrderByTradingDateAsc(
+                stock.getId(), mappedPeriod);
         if (prices.isEmpty()) {
             throw new BaseException(StockErrorCode.STOCK_002);
         }
@@ -283,18 +279,6 @@ public class StockService {
             case "1M" -> StockPricePeriod.MONTHLY;
             case "1Y" -> StockPricePeriod.YEARLY;
             default -> StockPricePeriod.DAILY;
-        };
-    }
-
-    private int resolveFetchSize(String period) {
-        String key = normalizePeriod(period);
-        return switch (key) {
-            case "1W" -> 52;
-            case "1M" -> 60;
-            case "1Y" -> 20;
-            case "3M" -> 60;
-            case "6M" -> 120;
-            default -> 120;
         };
     }
 
