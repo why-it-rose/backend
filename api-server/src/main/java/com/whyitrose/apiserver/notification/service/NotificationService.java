@@ -216,6 +216,7 @@ public class NotificationService {
                 stock.getId(),
                 stock.getName(),
                 stock.getTicker(),
+                stock.getLogoUrl(),
                 newsList.size(),
                 newsList
         );
