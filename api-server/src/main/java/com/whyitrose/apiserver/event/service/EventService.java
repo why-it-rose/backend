@@ -12,6 +12,8 @@ import com.whyitrose.domain.event.EventType;
 import com.whyitrose.domain.stock.Stock;
 import com.whyitrose.domain.stock.StockPrice;
 import com.whyitrose.domain.stock.StockPriceRepository;
+import com.whyitrose.domain.scrap.Scrap;
+import com.whyitrose.domain.scrap.ScrapRepository;
 import com.whyitrose.domain.stock.StockRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,6 +43,7 @@ public class EventService {
     private final StockRepository      stockRepository;
     private final StockPriceRepository stockPriceRepository;
     private final EventRepository      eventRepository;
+    private final ScrapRepository      scrapRepository;
 
     // ── 이벤트 목록 조회 ─────────────────────────────────────────────────
 
@@ -66,11 +69,16 @@ public class EventService {
 
     // ── 이벤트 상세 조회 ─────────────────────────────────────────────────
 
-    public EventDetailResponse getEventDetail(Long eventId) {
+    public EventDetailResponse getEventDetail(Long userId, Long eventId) {
         Event event = eventRepository.findByIdWithNews(eventId)
                 .orElseThrow(() -> new BaseException(EventErrorCode.EVENT_NOT_FOUND));
 
-        return EventDetailResponse.from(event);
+        boolean isScraped = userId != null &&
+                scrapRepository.findByUserIdAndEventId(userId, eventId)
+                        .map(s -> s.getStatus() == Status.ACTIVE)
+                        .orElse(false);
+
+        return EventDetailResponse.from(event, isScraped);
     }
 
     // ── 이벤트 탐지 실행 ─────────────────────────────────────────────────
