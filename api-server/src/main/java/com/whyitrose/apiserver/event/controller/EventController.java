@@ -121,7 +121,8 @@ public class EventController {
                                     "url": "https://www.hankyung.com/article/123456",
                                     "thumbnailUrl": "https://img.hankyung.com/photo/123456.jpg",
                                     "publishedAt": "2024-03-16T09:30:00",
-                                    "relevanceScore": 0.9231
+                                    "relevanceScore": 0.9231,
+                                    "tags": ["기업", "제품"]
                                   }
                                 ]
                               }

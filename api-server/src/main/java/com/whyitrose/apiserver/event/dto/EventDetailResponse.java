@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 @Schema(description = "이벤트 상세 응답")
 public record EventDetailResponse(
@@ -49,11 +50,11 @@ public record EventDetailResponse(
         @Schema(description = "스크랩 여부", example = "false")
         boolean isScraped
 ) {
-    public static EventDetailResponse from(Event event, boolean isScraped) {
+    public static EventDetailResponse from(Event event, Map<Long, List<String>> tagsByNewsId, boolean isScraped) {
         List<EventNewsResponse> newsList = event.getEventNewsList().stream()
                 .filter(en -> en.getStatus() == Status.ACTIVE)
                 .sorted((a, b) -> b.getRelevanceScore().compareTo(a.getRelevanceScore()))
-                .map(EventNewsResponse::from)
+                .map(en -> EventNewsResponse.from(en, tagsByNewsId.getOrDefault(en.getNews().getId(), List.of())))
                 .toList();
 
         return new EventDetailResponse(
