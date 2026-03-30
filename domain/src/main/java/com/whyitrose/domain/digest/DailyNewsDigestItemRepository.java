@@ -17,4 +17,8 @@ public interface DailyNewsDigestItemRepository extends JpaRepository<DailyNewsDi
     // FCM 개인화 메시지용 — stock명 + 뉴스 수 계산을 위해 stock/news 함께 조회
     @Query("SELECT i FROM DailyNewsDigestItem i JOIN FETCH i.stock JOIN FETCH i.news WHERE i.digest.id = :digestId AND i.status = 'ACTIVE'")
     List<DailyNewsDigestItem> findByDigestIdWithStockAndNews(@Param("digestId") Long digestId);
+
+    // 알림 목록 조회용 — N+1 방지: digestId IN 절로 한번에 조회
+    @Query("SELECT i FROM DailyNewsDigestItem i JOIN FETCH i.stock JOIN FETCH i.news WHERE i.digest.id IN :digestIds AND i.status = 'ACTIVE'")
+    List<DailyNewsDigestItem> findByDigestIdInWithStockAndNews(@Param("digestIds") List<Long> digestIds);
 }
