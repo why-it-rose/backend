@@ -30,6 +30,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
            """)
     Optional<Event> findByIdWithNews(@Param("id") Long id);
 
+
     // 동일 stock_id + start_date 중복 여부 확인
     boolean existsByStockIdAndStartDate(Long stockId, LocalDate startDate);
 

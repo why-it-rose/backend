@@ -9,10 +9,10 @@ import com.whyitrose.domain.common.Status;
 import com.whyitrose.domain.event.Event;
 import com.whyitrose.domain.event.EventRepository;
 import com.whyitrose.domain.event.EventType;
+import com.whyitrose.domain.news.NewsTagRepository;
 import com.whyitrose.domain.stock.Stock;
 import com.whyitrose.domain.stock.StockPrice;
 import com.whyitrose.domain.stock.StockPriceRepository;
-import com.whyitrose.domain.scrap.Scrap;
 import com.whyitrose.domain.scrap.ScrapRepository;
 import com.whyitrose.domain.stock.StockRepository;
 import lombok.RequiredArgsConstructor;
@@ -25,8 +25,10 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalDouble;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -44,6 +46,7 @@ public class EventService {
     private final StockPriceRepository stockPriceRepository;
     private final EventRepository      eventRepository;
     private final ScrapRepository      scrapRepository;
+    private final NewsTagRepository    newsTagRepository;
 
     // ── 이벤트 목록 조회 ─────────────────────────────────────────────────
 
@@ -73,12 +76,29 @@ public class EventService {
         Event event = eventRepository.findByIdWithNews(eventId)
                 .orElseThrow(() -> new BaseException(EventErrorCode.EVENT_NOT_FOUND));
 
+        List<Long> newsIds = event.getEventNewsList().stream()
+                .filter(eventNews -> eventNews.getStatus() == Status.ACTIVE)
+                .map(eventNews -> eventNews.getNews().getId())
+                .distinct()
+                .toList();
+
+        Map<Long, List<String>> tagsByNewsId = newsIds.isEmpty()
+                ? Map.of()
+                : newsTagRepository.findByNewsIdInWithTag(newsIds).stream()
+                        .collect(Collectors.groupingBy(
+                                nt -> nt.getNews().getId(),
+                                Collectors.collectingAndThen(
+                                        Collectors.mapping(nt -> nt.getTag().getName(), Collectors.toList()),
+                                        tags -> tags.stream().distinct().limit(2).toList()
+                                )
+                        ));
+
         boolean isScraped = userId != null &&
                 scrapRepository.findByUserIdAndEventId(userId, eventId)
                         .map(s -> s.getStatus() == Status.ACTIVE)
                         .orElse(false);
 
-        return EventDetailResponse.from(event, isScraped);
+        return EventDetailResponse.from(event, tagsByNewsId, isScraped);
     }
 
     // ── 이벤트 탐지 실행 ─────────────────────────────────────────────────
