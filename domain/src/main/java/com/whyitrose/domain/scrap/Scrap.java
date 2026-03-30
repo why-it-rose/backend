@@ -52,4 +52,8 @@ public class Scrap extends BaseTimeEntity {
     public void delete() {
         this.status = Status.DELETED;
     }
+
+    public void reactivate() {
+        this.status = Status.ACTIVE;
+    }
 }

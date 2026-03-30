@@ -27,7 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-@Tag(name = "Memo", description = "메모 API")
+@Tag(name = "memo-controller", description = "메모 API")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping

@@ -44,9 +44,12 @@ public record EventDetailResponse(
         String summary,
 
         @Schema(description = "연관 뉴스 목록 (관련도 내림차순)")
-        List<EventNewsResponse> newsList
+        List<EventNewsResponse> newsList,
+
+        @Schema(description = "스크랩 여부", example = "false")
+        boolean isScraped
 ) {
-    public static EventDetailResponse from(Event event) {
+    public static EventDetailResponse from(Event event, boolean isScraped) {
         List<EventNewsResponse> newsList = event.getEventNewsList().stream()
                 .filter(en -> en.getStatus() == Status.ACTIVE)
                 .sorted((a, b) -> b.getRelevanceScore().compareTo(a.getRelevanceScore()))
@@ -65,7 +68,8 @@ public record EventDetailResponse(
                 event.getPriceBefore(),
                 event.getPriceAfter(),
                 event.getSummary(),
-                newsList
+                newsList,
+                isScraped
         );
     }
 }
