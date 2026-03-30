@@ -21,10 +21,13 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     List<Event> findByStatus(Status status);
 
     // 이벤트 상세 + 연관 뉴스 JOIN FETCH (N+1 방지)
-    @Query("SELECT e FROM Event e " +
-           "LEFT JOIN FETCH e.eventNewsList en " +
-           "LEFT JOIN FETCH en.news " +
-           "WHERE e.id = :id")
+    @Query("""
+           SELECT e FROM Event e
+           LEFT JOIN FETCH e.eventNewsList en 
+           LEFT JOIN FETCH en.news 
+           WHERE e.id = :id
+           ORDER BY en.relevanceScore DESC           
+           """)
     Optional<Event> findByIdWithNews(@Param("id") Long id);
 
     // 동일 stock_id + start_date 중복 여부 확인
