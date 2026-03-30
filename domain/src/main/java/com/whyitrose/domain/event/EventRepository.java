@@ -30,6 +30,13 @@ public interface EventRepository extends JpaRepository<Event, Long> {
            """)
     Optional<Event> findByIdWithNews(@Param("id") Long id);
 
+    @Query("""
+       SELECT nt.news.id, nt.tag.name
+       FROM NewsTag nt
+       WHERE nt.news.id IN :newsIds
+       """)
+    List<Object> findTagNamesByNewsIds(@Param("newsIds") List<Long> newsIds);
+
     // 동일 stock_id + start_date 중복 여부 확인
     boolean existsByStockIdAndStartDate(Long stockId, LocalDate startDate);
 

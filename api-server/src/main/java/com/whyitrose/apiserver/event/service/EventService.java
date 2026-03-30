@@ -7,6 +7,7 @@ import com.whyitrose.apiserver.event.exception.EventErrorCode;
 import com.whyitrose.core.exception.BaseException;
 import com.whyitrose.domain.common.Status;
 import com.whyitrose.domain.event.Event;
+import com.whyitrose.domain.event.EventNews;
 import com.whyitrose.domain.event.EventRepository;
 import com.whyitrose.domain.event.EventType;
 import com.whyitrose.domain.stock.Stock;
@@ -73,12 +74,19 @@ public class EventService {
         Event event = eventRepository.findByIdWithNews(eventId)
                 .orElseThrow(() -> new BaseException(EventErrorCode.EVENT_NOT_FOUND));
 
+        List<Long> newsIds = event.getEventNewsList().stream()
+                .map(eventNews -> eventNews.getNews().getId())
+                .distinct()
+                .toList();
+
+        Object tagByNews = eventRepository.findTagNamesByNewsIds(newsIds);
+
         boolean isScraped = userId != null &&
                 scrapRepository.findByUserIdAndEventId(userId, eventId)
                         .map(s -> s.getStatus() == Status.ACTIVE)
                         .orElse(false);
 
-        return EventDetailResponse.from(event, isScraped);
+        return EventDetailResponse.from(tagByNews, event, isScraped);
     }
 
     // ── 이벤트 탐지 실행 ─────────────────────────────────────────────────

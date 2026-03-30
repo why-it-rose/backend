@@ -47,9 +47,12 @@ public record EventDetailResponse(
         List<EventNewsResponse> newsList,
 
         @Schema(description = "스크랩 여부", example = "false")
-        boolean isScraped
+        boolean isScraped,
+
+        @Schema(description = "뉴스 태그", example = "false")
+        Object tagByNews
 ) {
-    public static EventDetailResponse from(Event event, boolean isScraped) {
+    public static EventDetailResponse from(Object tagByNews, Event event, boolean isScraped) {
         List<EventNewsResponse> newsList = event.getEventNewsList().stream()
                 .filter(en -> en.getStatus() == Status.ACTIVE)
                 .sorted((a, b) -> b.getRelevanceScore().compareTo(a.getRelevanceScore()))
@@ -69,7 +72,8 @@ public record EventDetailResponse(
                 event.getPriceAfter(),
                 event.getSummary(),
                 newsList,
-                isScraped
+                isScraped,
+                tagByNews
         );
     }
 }
