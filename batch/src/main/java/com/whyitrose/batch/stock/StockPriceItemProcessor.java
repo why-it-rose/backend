@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.whyitrose.batch.ls.LsMarketDataClient;
 import com.whyitrose.domain.stock.Stock;
 import com.whyitrose.domain.stock.StockPricePeriod;
+import com.whyitrose.domain.stock.StockPriceRepository;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -38,8 +39,9 @@ public class StockPriceItemProcessor implements ItemProcessor<Stock, StockPriceB
     private static final List<String> DAILY_GUBUNS = List.of("2", "3", "4");
 
     private final LsMarketDataClient lsMarketDataClient;
+    private final StockPriceRepository stockPriceRepository;
 
-    /** 0 = 전체 이력 로드, N = 최근 N일만 로드 */
+    /** 0 = 전체 이력 로드, N = 최근 N일 기준 fallback (DB에 데이터 없을 때만 사용) */
     @Value("${stock.price.days-back:0}")
     private int daysBack;
 
@@ -49,9 +51,7 @@ public class StockPriceItemProcessor implements ItemProcessor<Stock, StockPriceB
 
         List<StockPricePeriod> periods = daysBack > 0 ? DAILY_PERIODS : ALL_PERIODS;
         List<String> gubuns = daysBack > 0 ? DAILY_GUBUNS : ALL_GUBUNS;
-        String sdate = daysBack > 0
-                ? LocalDate.now().minusDays(daysBack).format(DateTimeFormatter.BASIC_ISO_DATE)
-                : "";
+        String sdate = daysBack > 0 ? resolveSdate(stock) : "";
 
         for (int i = 0; i < periods.size(); i++) {
             StockPricePeriod period = periods.get(i);
@@ -75,6 +75,26 @@ public class StockPriceItemProcessor implements ItemProcessor<Stock, StockPriceB
         }
 
         return new StockPriceBatch(stock, rows);
+    }
+
+    /**
+     * 동적 sdate 계산 — 공백 기간 자동 보정
+     * DB에 저장된 마지막 DAILY 가격 날짜 + 1일을 시작일로 사용.
+     * 데이터가 전혀 없으면 days-back 기준으로 fallback.
+     */
+    private String resolveSdate(Stock stock) {
+        return stockPriceRepository
+                .findTopByStockIdAndPeriodOrderByTradingDateDesc(stock.getId(), StockPricePeriod.DAILY)
+                .map(lastPrice -> {
+                    LocalDate from = lastPrice.getTradingDate().plusDays(1);
+                    log.info("동적 sdate: ticker={}, lastDate={}, from={}", stock.getTicker(), lastPrice.getTradingDate(), from);
+                    return from.format(BASIC_DATE);
+                })
+                .orElseGet(() -> {
+                    LocalDate fallback = LocalDate.now().minusDays(daysBack);
+                    log.info("fallback sdate: ticker={}, from={}", stock.getTicker(), fallback);
+                    return fallback.format(BASIC_DATE);
+                });
     }
 
     private static LocalDate parseDate(String yyyyMMdd) {

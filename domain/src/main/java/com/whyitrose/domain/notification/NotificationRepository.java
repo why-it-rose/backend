@@ -9,8 +9,12 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 public interface NotificationRepository extends JpaRepository<Notification, Long> {
+
+    // 오늘의 뉴스 — 해당 유저의 digest 기준 알림 1건 조회 (예측 상태 확인용)
+    Optional<Notification> findByUserIdAndDigestIdAndStatus(Long userId, Long digestId, Status status);
 
     // idx_notifications_user_date 활용
     List<Notification> findByUserIdAndStatusOrderByCreatedAtDesc(Long userId, Status status, Pageable pageable);
