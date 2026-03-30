@@ -11,6 +11,7 @@ public interface ScrapRepository extends JpaRepository<Scrap, Long> {
 
     Optional<Scrap> findByUserIdAndEventId(Long userId, Long eventId);
 
-    // idx_scraps_user 활용 — created_at DESC 정렬
-    List<Scrap> findByUserIdAndStatusOrderByCreatedAtDesc(Long userId, Status status, Pageable pageable);
+    long countByUserIdAndStatus(Long userId, Status status);
+
+    List<Scrap> findByUserIdAndStatus(Long userId, Status status, Pageable pageable);
 }
