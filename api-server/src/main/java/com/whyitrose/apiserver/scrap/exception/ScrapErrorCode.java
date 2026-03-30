@@ -12,7 +12,8 @@ public enum ScrapErrorCode implements ResponseStatus {
 
     SCRAP_NOT_FOUND(false, HttpStatus.NOT_FOUND, 4020, "존재하지 않는 스크랩입니다."),
     EVENT_NOT_FOUND(false, HttpStatus.NOT_FOUND, 4021, "존재하지 않는 이벤트입니다."),
-    ALREADY_SCRAPED(false, HttpStatus.CONFLICT, 4022, "이미 스크랩한 이벤트입니다.");
+    ALREADY_SCRAPED(false, HttpStatus.CONFLICT, 4022, "이미 스크랩한 이벤트입니다."),
+    SCRAP_LIMIT_EXCEEDED(false, HttpStatus.CONFLICT, 4023, "스크랩은 최대 50개까지 가능합니다.");
 
     private final boolean isSuccess;
     @JsonIgnore

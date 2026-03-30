@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Sort;
 
 import java.util.List;
 import java.util.Optional;
@@ -26,6 +27,7 @@ public class ScrapService {
     private final ScrapRepository scrapRepository;
     private final EventRepository eventRepository;
     private final UserRepository userRepository;
+    private static final int MAX_ACTIVE_SCRAPS = 50;
 
     // ── 스크랩 추가 ──────────────────────────────────────────────────────
 
@@ -45,11 +47,12 @@ public class ScrapService {
             if (scrap.getStatus() == Status.ACTIVE) {
                 throw new BaseException(ScrapErrorCode.ALREADY_SCRAPED);
             }
-            // 이전에 삭제된 스크랩 재활성화 (unique 제약 유지)
+            validateActiveScrapLimit(userId); // 재활성화도 한도 체크
             scrap.reactivate();
             return;
         }
 
+        validateActiveScrapLimit(userId); // 신규 추가 한도 체크
         scrapRepository.save(Scrap.create(user, event));
     }
 
@@ -67,9 +70,26 @@ public class ScrapService {
     // ── 내 스크랩 목록 ────────────────────────────────────────────────────
 
     public List<ScrapResponse> getMyScraps(Long userId) {
-        return scrapRepository.findByUserIdAndStatusOrderByCreatedAtDesc(userId, Status.ACTIVE, PageRequest.of(0, 50))
+        PageRequest pageRequest = PageRequest.of(
+                0,
+                MAX_ACTIVE_SCRAPS,
+                Sort.by(
+                        Sort.Order.desc("updatedAt"),
+                        Sort.Order.desc("id")
+                )
+        );
+
+        return scrapRepository.findByUserIdAndStatus(userId, Status.ACTIVE, pageRequest)
                 .stream()
                 .map(ScrapResponse::from)
                 .toList();
     }
+
+    private void validateActiveScrapLimit(Long userId) {
+        long activeCount = scrapRepository.countByUserIdAndStatus(userId, Status.ACTIVE);
+        if (activeCount >= MAX_ACTIVE_SCRAPS) {
+            throw new BaseException(ScrapErrorCode.SCRAP_LIMIT_EXCEEDED);
+        }
+    }
 }
+

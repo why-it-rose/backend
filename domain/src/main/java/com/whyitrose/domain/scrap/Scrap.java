@@ -16,7 +16,7 @@ import lombok.NoArgsConstructor;
                 @UniqueConstraint(name = "uq_scraps", columnNames = {"user_id", "event_id"})
         },
         indexes = {
-                @Index(name = "idx_scraps_user", columnList = "user_id, created_at DESC")
+                @Index(name = "idx_scraps_user_updated", columnList = "user_id, updated_at DESC")
         }
 )
 @Getter
