@@ -40,6 +40,10 @@ public class StockDtos {
             List<StockSearchItem> items
     ) {}
 
+    public record InterestStockListResponse(
+            List<StockSearchItem> items
+    ) {}
+
     public record StockSearchItem(
             Long stockId,
             String ticker,

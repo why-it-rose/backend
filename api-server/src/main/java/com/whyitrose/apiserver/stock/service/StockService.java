@@ -123,22 +123,24 @@ public class StockService {
 
         List<StockSearchItem> items = dedup.values().stream()
                 .limit(size)
-                .map(stock -> {
-                    PriceSnapshot snapshot = latestSnapshot(stock.getId(), "1D");
-                    return new StockSearchItem(
-                            stock.getId(),
-                            stock.getTicker(),
-                            stock.getName(),
-                            stock.getMarket().name(),
-                            stock.getLogoUrl(),
-                            snapshot.currentPrice,
-                            snapshot.changeRate,
-                            snapshot.direction
-                    );
-                })
+                .map(this::toSearchItem)
                 .toList();
 
         return new StockSearchResponse(q, items.size(), items);
+    }
+
+    public StockSearchItem toSearchItem(Stock stock) {
+        PriceSnapshot snapshot = latestSnapshot(stock.getId(), "1D");
+        return new StockSearchItem(
+                stock.getId(),
+                stock.getTicker(),
+                stock.getName(),
+                stock.getMarket().name(),
+                stock.getLogoUrl(),
+                snapshot.currentPrice,
+                snapshot.changeRate,
+                snapshot.direction
+        );
     }
 
     public StockDetailResponse getStockDetail(Long stockId) {
