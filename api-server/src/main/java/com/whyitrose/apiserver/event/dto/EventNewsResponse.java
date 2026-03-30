@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Schema(description = "이벤트 연관 뉴스")
 public record EventNewsResponse(
@@ -27,9 +28,12 @@ public record EventNewsResponse(
         LocalDateTime publishedAt,
 
         @Schema(description = "이벤트 관련도 점수 (0~1)", example = "0.9231")
-        BigDecimal relevanceScore
+        BigDecimal relevanceScore,
+
+        @Schema(description = "뉴스 태그(최대 2개)", example = "[\"반도체\", \"실적\"]")
+        List<String> tags
 ) {
-    public static EventNewsResponse from(EventNews eventNews) {
+    public static EventNewsResponse from(EventNews eventNews, List<String> tags) {
         return new EventNewsResponse(
                 eventNews.getNews().getId(),
                 eventNews.getNews().getTitle(),
@@ -37,7 +41,8 @@ public record EventNewsResponse(
                 eventNews.getNews().getUrl(),
                 eventNews.getNews().getThumbnailUrl(),
                 eventNews.getNews().getPublishedAt(),
-                eventNews.getRelevanceScore()
+                eventNews.getRelevanceScore(),
+                tags
         );
     }
 }
