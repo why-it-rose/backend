@@ -57,6 +57,7 @@ public class EventService {
                 : eventRepository.findByStockIdAndStatusOrderByStartDateDesc(stockId, Status.ACTIVE, pageable);
 
         return events.stream()
+                .filter(event -> !event.getEventNewsList().isEmpty())
                 .map(EventResponse::from)
                 .toList();
     }
