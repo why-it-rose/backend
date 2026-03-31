@@ -15,6 +15,10 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Sort;
+import com.whyitrose.apiserver.scrap.dto.MyScrapSearchItemResponse;
+import com.whyitrose.apiserver.scrap.dto.MyScrapSearchPageResponse;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.Optional;
@@ -91,5 +95,47 @@ public class ScrapService {
             throw new BaseException(ScrapErrorCode.SCRAP_LIMIT_EXCEEDED);
         }
     }
+
+    public MyScrapSearchPageResponse searchMyScraps(Long userId, String q, int page, int size, String sort) {
+        String keyword = (q == null) ? "" : q.trim();
+        Pageable pageable = PageRequest.of(page, size, parseSort(sort));
+
+        Page<Scrap> scrapPage;
+        if (keyword.isBlank()) {
+            scrapPage = scrapRepository.findByUserIdAndStatus(userId, Status.ACTIVE, pageable);
+        } else {
+            scrapPage = scrapRepository
+                    .findByUserIdAndStatusAndEvent_Stock_NameContainingIgnoreCaseOrUserIdAndStatusAndEvent_Stock_TickerContainingIgnoreCase(
+                            userId, Status.ACTIVE, keyword,
+                            userId, Status.ACTIVE, keyword,
+                            pageable
+                    );
+        }
+
+        return new MyScrapSearchPageResponse(
+                scrapPage.getContent().stream()
+                        .map(MyScrapSearchItemResponse::from)
+                        .toList(),
+                scrapPage.getNumber(),
+                scrapPage.getSize(),
+                scrapPage.getTotalElements(),
+                scrapPage.getTotalPages()
+        );
+    }
+
+    private Sort parseSort(String sort) {
+        if (sort == null || sort.isBlank()) {
+            return Sort.by(Sort.Order.desc("updatedAt"));
+        }
+
+        String[] tokens = sort.split(",");
+        String property = tokens[0].trim();
+        String direction = (tokens.length > 1) ? tokens[1].trim() : "desc";
+
+        return "asc".equalsIgnoreCase(direction)
+                ? Sort.by(Sort.Order.asc(property))
+                : Sort.by(Sort.Order.desc(property));
+    }
+
 }
 

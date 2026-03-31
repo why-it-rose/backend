@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import com.whyitrose.apiserver.scrap.dto.MyScrapSearchPageResponse;
 
 import java.util.List;
 
@@ -110,4 +111,18 @@ public class ScrapController {
     ) {
         return ResponseEntity.ok(BaseResponse.success(scrapService.getMyScraps(userId)));
     }
+
+    @GetMapping("/scraps/my/search")
+    public ResponseEntity<BaseResponse<MyScrapSearchPageResponse>> searchMyScraps(
+            @AuthenticationPrincipal Long userId,
+            @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "updatedAt,desc") String sort
+    ) {
+        return ResponseEntity.ok(
+                BaseResponse.success(scrapService.searchMyScraps(userId, q, page, size, sort))
+        );
+    }
+
 }
