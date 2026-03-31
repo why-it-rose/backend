@@ -13,92 +13,80 @@ import com.whyitrose.apiserver.stock.exception.StockErrorCode;
 import com.whyitrose.core.exception.BaseException;
 import com.whyitrose.domain.common.Status;
 import com.whyitrose.domain.stock.Stock;
+import com.whyitrose.domain.stock.StockListSnapshot;
+import com.whyitrose.domain.stock.StockListSnapshotRepository;
+import com.whyitrose.domain.stock.StockMarket;
 import com.whyitrose.domain.stock.StockPrice;
 import com.whyitrose.domain.stock.StockPricePeriod;
 import com.whyitrose.domain.stock.StockPriceRepository;
 import com.whyitrose.domain.stock.StockRepository;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.Base64;
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
+@Transactional
 public class StockService {
 
     private final StockRepository stockRepository;
     private final StockPriceRepository stockPriceRepository;
+    private final StockListSnapshotRepository stockListSnapshotRepository;
 
     public StockListResponse getStocks(String market, String sort, String period, String cursor, Integer size) {
         int pageSize = Math.max(1, Math.min(size == null ? 20 : size, 100));
-        int offset = parseCursor(cursor);
-        List<Stock> stocks = stockRepository.findByStatusOrderByIdAsc(Status.ACTIVE);
-        if (market != null && !"ALL".equalsIgnoreCase(market)) {
-            stocks = stocks.stream()
-                    .filter(s -> s.getMarket().name().equalsIgnoreCase(market))
-                    .toList();
+        String sortKey = normalizeSort(sort);
+        String periodKey = normalizePeriod(period);
+
+        StockListCursor parsedCursor = decodeCursor(cursor, sortKey);
+        StockMarket marketFilter = resolveMarket(market);
+        int startRank = parsedCursor == null ? 1 : parsedCursor.nextRank();
+        Pageable pageable = PageRequest.of(0, pageSize + 1);
+        List<StockListSnapshot> rows = fetchSnapshots(sortKey, periodKey, marketFilter, parsedCursor, pageable);
+        boolean hasNext = rows.size() > pageSize;
+        if (hasNext) {
+            rows = rows.subList(0, pageSize);
         }
 
-        List<StockListItem> allItems = new ArrayList<>();
-        for (Stock stock : stocks) {
-            PriceSnapshot snapshot = latestSnapshot(stock.getId(), period);
-            allItems.add(new StockListItem(
-                    0,
+        List<StockListItem> ranked = new ArrayList<>();
+        int rank = startRank;
+        for (StockListSnapshot row : rows) {
+            Stock stock = row.getStock();
+            ChangeDirection direction = row.getPriceChange() > 0
+                    ? ChangeDirection.UP
+                    : (row.getPriceChange() < 0 ? ChangeDirection.DOWN : ChangeDirection.FLAT);
+            ranked.add(new StockListItem(
+                    rank++,
                     stock.getId(),
                     stock.getTicker(),
                     stock.getName(),
                     stock.getMarket().name(),
                     stock.getLogoUrl(),
-                    snapshot.currentPrice,
-                    snapshot.priceChange,
-                    snapshot.changeRate,
-                    snapshot.direction,
-                    snapshot.tradingAmount,
-                    snapshot.tradingVolume,
+                    row.getCurrentPrice(),
+                    row.getPriceChange(),
+                    row.getChangeRate(),
+                    direction,
+                    row.getTradingAmount(),
+                    row.getTradingVolume(),
                     false,
                     null,
                     false
             ));
         }
 
-        allItems.sort(stockComparator(sort));
-        if (offset < 0 || offset > allItems.size()) {
-            offset = 0;
-        }
-        int endExclusive = Math.min(allItems.size(), offset + pageSize);
-        List<StockListItem> content = allItems.subList(offset, endExclusive);
-        boolean hasNext = endExclusive < allItems.size();
-        List<StockListItem> ranked = new ArrayList<>();
-        int rank = offset + 1;
-        for (StockListItem item : content) {
-            ranked.add(new StockListItem(
-                    rank++,
-                    item.stockId(),
-                    item.ticker(),
-                    item.name(),
-                    item.market(),
-                    item.logoUrl(),
-                    item.currentPrice(),
-                    item.priceChange(),
-                    item.changeRate(),
-                    item.changeDirection(),
-                    item.tradingAmount(),
-                    item.tradingVolume(),
-                    item.hasEvent(),
-                    item.eventType(),
-                    item.isInterested()
-            ));
-        }
-
-        String nextCursor = hasNext ? String.valueOf(endExclusive) : null;
+        String nextCursor = hasNext && !rows.isEmpty()
+                ? encodeCursor(buildCursor(sortKey, rows.get(rows.size() - 1), rank))
+                : null;
         return new StockListResponse(nextCursor, hasNext, ranked.size(), ranked);
     }
 
@@ -202,6 +190,10 @@ public class StockService {
         String key = normalizePeriod(period);
         StockPricePeriod mappedPeriod = resolvePricePeriod(key);
         int tradingDays = resolveTradingDays(key);
+        return latestSnapshot(stockId, mappedPeriod, tradingDays);
+    }
+
+    private PriceSnapshot latestSnapshot(Long stockId, StockPricePeriod mappedPeriod, int tradingDays) {
         List<StockPrice> desc = stockPriceRepository.findByStockIdAndPeriodOrderByTradingDateDesc(
                 stockId, mappedPeriod, PageRequest.of(0, Math.max(2, tradingDays + 1)));
         if (desc.isEmpty()) {
@@ -227,28 +219,152 @@ public class StockService {
         return new PriceSnapshot(currentPrice, change, round2(rate), direction, tradingAmount, tradingVolume);
     }
 
-    private Comparator<StockListItem> stockComparator(String sort) {
-        String key = sort == null ? "TRADING_AMOUNT" : sort.toUpperCase(Locale.ROOT);
+    private String normalizeSort(String sort) {
+        if (sort == null || sort.isBlank()) {
+            return "TRADING_AMOUNT";
+        }
+        String key = sort.toUpperCase(Locale.ROOT);
         return switch (key) {
-            case "TRADING_VOLUME" -> Comparator.comparingLong(StockListItem::tradingVolume).reversed()
-                    .thenComparingLong(StockListItem::stockId);
-            case "SURGE" -> Comparator.comparingDouble(StockListItem::changeRate).reversed()
-                    .thenComparingLong(StockListItem::stockId);
-            case "DROP" -> Comparator.comparingDouble(StockListItem::changeRate)
-                    .thenComparingLong(StockListItem::stockId);
-            default -> Comparator.comparingLong(StockListItem::tradingAmount).reversed()
-                    .thenComparingLong(StockListItem::stockId);
+            case "TRADING_VOLUME", "SURGE", "DROP", "TRADING_AMOUNT" -> key;
+            default -> "TRADING_AMOUNT";
         };
     }
 
-    private int parseCursor(String cursor) {
-        if (cursor == null || cursor.isBlank()) {
-            return 0;
+    private StockMarket resolveMarket(String market) {
+        if (market == null || market.isBlank() || "ALL".equalsIgnoreCase(market)) {
+            return null;
         }
         try {
-            return Integer.parseInt(cursor);
-        } catch (NumberFormatException ignored) {
-            return 0;
+            return StockMarket.valueOf(market.toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
+    private List<StockListSnapshot> fetchSnapshots(
+            String sortKey,
+            String periodKey,
+            StockMarket marketFilter,
+            StockListCursor cursor,
+            Pageable pageable
+    ) {
+        if (cursor == null) {
+            return switch (sortKey) {
+                case "TRADING_VOLUME" -> stockListSnapshotRepository.findFirstByTradingVolume(periodKey, marketFilter, pageable);
+                case "SURGE" -> stockListSnapshotRepository.findFirstBySurge(periodKey, marketFilter, pageable);
+                case "DROP" -> stockListSnapshotRepository.findFirstByDrop(periodKey, marketFilter, pageable);
+                default -> stockListSnapshotRepository.findFirstByTradingAmount(periodKey, marketFilter, pageable);
+            };
+        }
+        return switch (sortKey) {
+            case "TRADING_VOLUME" -> stockListSnapshotRepository.findNextByTradingVolume(
+                    periodKey,
+                    marketFilter,
+                    Long.parseLong(cursor.sortValue()),
+                    cursor.stockId(),
+                    pageable
+            );
+            case "SURGE" -> stockListSnapshotRepository.findNextBySurge(
+                    periodKey,
+                    marketFilter,
+                    Double.parseDouble(cursor.sortValue()),
+                    cursor.stockId(),
+                    pageable
+            );
+            case "DROP" -> stockListSnapshotRepository.findNextByDrop(
+                    periodKey,
+                    marketFilter,
+                    Double.parseDouble(cursor.sortValue()),
+                    cursor.stockId(),
+                    pageable
+            );
+            default -> stockListSnapshotRepository.findNextByTradingAmount(
+                    periodKey,
+                    marketFilter,
+                    Long.parseLong(cursor.sortValue()),
+                    cursor.stockId(),
+                    pageable
+            );
+        };
+    }
+
+    public synchronized void refreshAllStockListSnapshots() {
+        List<String> periodKeys = List.of("REALTIME", "1D", "1W", "1M", "3M", "6M", "1Y");
+        for (String periodKey : periodKeys) {
+            recomputeSnapshots(periodKey, resolvePricePeriod(periodKey));
+        }
+    }
+
+    private void recomputeSnapshots(String periodKey, StockPricePeriod mappedPeriod) {
+        List<Stock> stocks = stockRepository.findByStatusOrderByIdAsc(Status.ACTIVE);
+        if (stocks.isEmpty()) {
+            return;
+        }
+        List<Long> stockIds = stocks.stream().map(Stock::getId).toList();
+        Map<Long, StockListSnapshot> existingByStockId = stockListSnapshotRepository
+                .findByPeriodKeyAndStockIdIn(periodKey, stockIds)
+                .stream()
+                .collect(java.util.stream.Collectors.toMap(s -> s.getStock().getId(), s -> s));
+
+        List<StockListSnapshot> upserts = new ArrayList<>(stocks.size());
+        int tradingDays = resolveTradingDays(periodKey);
+        for (Stock stock : stocks) {
+            PriceSnapshot snapshot = latestSnapshot(stock.getId(), mappedPeriod, tradingDays);
+            StockListSnapshot existing = existingByStockId.get(stock.getId());
+            if (existing == null) {
+                upserts.add(StockListSnapshot.create(
+                        stock,
+                        periodKey,
+                        snapshot.currentPrice,
+                        snapshot.priceChange,
+                        snapshot.changeRate,
+                        snapshot.tradingAmount,
+                        snapshot.tradingVolume
+                ));
+            } else {
+                existing.apply(
+                        snapshot.currentPrice,
+                        snapshot.priceChange,
+                        snapshot.changeRate,
+                        snapshot.tradingAmount,
+                        snapshot.tradingVolume
+                );
+                upserts.add(existing);
+            }
+        }
+        stockListSnapshotRepository.saveAll(upserts);
+    }
+
+    private StockListCursor buildCursor(String sortKey, StockListSnapshot row, int nextRank) {
+        Long stockId = row.getStock().getId();
+        return switch (sortKey) {
+            case "TRADING_VOLUME" -> new StockListCursor(sortKey, String.valueOf(row.getTradingVolume()), stockId, nextRank);
+            case "SURGE", "DROP" -> new StockListCursor(sortKey, String.valueOf(row.getChangeRate()), stockId, nextRank);
+            default -> new StockListCursor(sortKey, String.valueOf(row.getTradingAmount()), stockId, nextRank);
+        };
+    }
+
+    private String encodeCursor(StockListCursor cursor) {
+        String raw = cursor.sortKey() + "|" + cursor.sortValue() + "|" + cursor.stockId() + "|" + cursor.nextRank();
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(raw.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private StockListCursor decodeCursor(String cursor, String sortKey) {
+        if (cursor == null || cursor.isBlank()) {
+            return null;
+        }
+        try {
+            String decoded = new String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8);
+            String[] parts = decoded.split("\\|");
+            if (parts.length != 4) {
+                return null;
+            }
+            if (!sortKey.equals(parts[0])) {
+                return null;
+            }
+            return new StockListCursor(parts[0], parts[1], Long.parseLong(parts[2]), Integer.parseInt(parts[3]));
+        } catch (Exception ignored) {
+            return null;
         }
     }
 
@@ -295,5 +411,12 @@ public class StockService {
             ChangeDirection direction,
             long tradingAmount,
             long tradingVolume
+    ) {}
+
+    private record StockListCursor(
+            String sortKey,
+            String sortValue,
+            long stockId,
+            int nextRank
     ) {}
 }
