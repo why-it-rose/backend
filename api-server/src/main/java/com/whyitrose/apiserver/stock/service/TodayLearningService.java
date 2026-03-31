@@ -122,6 +122,7 @@ public class TodayLearningService {
         PredictionInfo predictionInfo = resolvePrediction(stockId, digestId);
 
         return Optional.of(new TodayLearningDetailResponse(
+                digestId,
                 formatDigestDate(digestDate),
                 stock.getName(),
                 changeRate,
@@ -154,10 +155,8 @@ public class TodayLearningService {
             return null;
         }
 
-        return notificationRepository
-                .findByUserIdAndDigestIdAndStatus(userId, digestId, Status.ACTIVE)
-                .flatMap(notification -> predictionRepository
-                        .findByUserIdAndNotificationIdAndStockId(userId, notification.getId(), stockId))
+        return predictionRepository
+                .findByUserIdAndDigestIdAndStockId(userId, digestId, stockId)
                 .map(PredictionInfo::from)
                 .orElse(null);
     }

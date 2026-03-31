@@ -32,6 +32,7 @@ public class TodayLearningDtos {
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record TodayLearningDetailResponse(
+            Long digestId,              // 예측 API 호출 시 사용
             String digestDate,          // "2026.03.29 (일)"
             String stockName,
             String changeRate,          // "+1.23%" — 전전날 종가 대비 전날 종가 (없으면 필드 생략)

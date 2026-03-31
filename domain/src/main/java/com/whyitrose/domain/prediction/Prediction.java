@@ -2,7 +2,7 @@ package com.whyitrose.domain.prediction;
 
 import com.whyitrose.domain.common.BaseTimeEntity;
 import com.whyitrose.domain.common.Status;
-import com.whyitrose.domain.notification.Notification;
+import com.whyitrose.domain.digest.DailyNewsDigest;
 import com.whyitrose.domain.stock.Stock;
 import com.whyitrose.domain.user.User;
 import jakarta.persistence.*;
@@ -17,7 +17,7 @@ import java.time.LocalDateTime;
 @Table(
         name = "predictions",
         uniqueConstraints = {
-                @UniqueConstraint(name = "uq_predictions", columnNames = {"user_id", "notification_id", "stock_id"})
+                @UniqueConstraint(name = "uq_predictions", columnNames = {"user_id", "digest_id", "stock_id"})
         },
         indexes = {
                 @Index(name = "idx_predictions_user", columnList = "user_id, created_at DESC")
@@ -37,8 +37,8 @@ public class Prediction extends BaseTimeEntity {
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "notification_id", nullable = false)
-    private Notification notification;
+    @JoinColumn(name = "digest_id", nullable = false)
+    private DailyNewsDigest digest;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "stock_id", nullable = false)
@@ -66,16 +66,18 @@ public class Prediction extends BaseTimeEntity {
     @Column(name = "status", length = 20, nullable = false)
     private Status status;
 
-    public static Prediction create(User user, Notification notification, Stock stock,
-                                    PredictionDirection direction, String reason) {
+    public static Prediction create(User user, DailyNewsDigest digest, Stock stock) {
         Prediction prediction = new Prediction();
         prediction.user = user;
-        prediction.notification = notification;
+        prediction.digest = digest;
         prediction.stock = stock;
-        prediction.direction = direction;
-        prediction.reason = reason;
         prediction.status = Status.ACTIVE;
         return prediction;
+    }
+
+    public void updatePrediction(PredictionDirection direction, String reason) {
+        this.direction = direction;
+        this.reason = reason;
     }
 
     // 배치에서 실제 등락률을 채울 때 호출
