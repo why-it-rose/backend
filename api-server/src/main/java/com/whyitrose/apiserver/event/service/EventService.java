@@ -78,6 +78,7 @@ public class EventService {
 
         List<Long> newsIds = event.getEventNewsList().stream()
                 .filter(eventNews -> eventNews.getStatus() == Status.ACTIVE)
+                .filter(eventNews -> eventNews.getNews().getStatus() == Status.ACTIVE)
                 .map(eventNews -> eventNews.getNews().getId())
                 .distinct()
                 .toList();
