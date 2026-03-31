@@ -57,6 +57,7 @@ public class EventService {
                 : eventRepository.findByStockIdAndStatusOrderByStartDateDesc(stockId, Status.ACTIVE, pageable);
 
         return events.stream()
+                .filter(event -> !event.getEventNewsList().isEmpty())
                 .map(EventResponse::from)
                 .toList();
     }
@@ -78,6 +79,7 @@ public class EventService {
 
         List<Long> newsIds = event.getEventNewsList().stream()
                 .filter(eventNews -> eventNews.getStatus() == Status.ACTIVE)
+                .filter(eventNews -> eventNews.getNews().getStatus() == Status.ACTIVE)
                 .map(eventNews -> eventNews.getNews().getId())
                 .distinct()
                 .toList();
