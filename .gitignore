@@ -8,6 +8,7 @@ bin/
 
 # Gradle
 .gradle/
+.gradle-local/
 build/
 !**/src/main/**/build/
 !**/src/test/**/build/
