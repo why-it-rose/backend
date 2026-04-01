@@ -80,7 +80,11 @@ REST API 서버 모듈입니다. 실행 가능한 Spring Boot 애플리케이션
 배치 처리 모듈입니다. 실행 가능한 Spring Boot 애플리케이션입니다.
 
 - 스케줄러
-- Spring Batch Job / Step 정의
+- Spring Batch Job / Step 정의 (현재 Job 비활성: `spring.batch.job.enabled=false`)
+- **stocks 적재**: LS OpenAPI `t9945`(주식마스터)로 `stocks` 테이블 UPSERT — 상세는 `docs/250-stocks-storage-spec.md` §2.6
+  - DB(`DB_*`)·`LS_ACCESS_TOKEN` 설정 후 예:
+    `.\gradlew.bat :batch:bootRun --args="--stock.master.load-at-startup=true"`
+  - 250종목만 넣으려면 `batch/src/main/resources/seed/index-universe.json`에 `kospi200` / `kosdaq50` 티커 배열을 채움
 - 의존: `domain`, `core`
 
 ---

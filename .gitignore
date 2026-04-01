@@ -4,11 +4,12 @@
 *.iml
 *.ipr
 out/
+bin/
 
 # Gradle
 .gradle/
+.gradle-local/
 build/
-!gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
 !**/src/test/**/build/
 
@@ -16,6 +17,7 @@ build/
 *.class
 *.log
 *.jar
+!gradle/wrapper/gradle-wrapper.jar
 *.war
 *.ear
 *.nar
@@ -43,4 +45,3 @@ Icon
 Network Trash Folder
 Temporary Items
 .apdisk
-

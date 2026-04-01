@@ -11,3 +11,18 @@ spring:
     properties:
       hibernate:
         format_sql: true
+jwt:
+  secret: ${JWT_SECRET}
+  access-token-expiration-ms: ${JWT_ACCESS_TOKEN_EXPIRATION_MS:1800000}
+  refresh-token-expiration-ms: ${JWT_REFRESH_TOKEN_EXPIRATION_MS:604800000}
+fcm:
+  key-json: ${FCM_KEY_JSON}
+cors:
+  allowed-origins:
+    - http://localhost:5173
+
+app:
+  auth:
+    cookie:
+      secure: ${AUTH_COOKIE_SECURE:false}
+      same-site: ${AUTH_COOKIE_SAME_SITE:Lax}
