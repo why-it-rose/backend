@@ -3,10 +3,8 @@ package com.whyitrose.batch.notification;
 import com.google.firebase.messaging.BatchResponse;
 import com.whyitrose.core.fcm.FcmService;
 import com.whyitrose.domain.common.Status;
-import com.whyitrose.domain.digest.DailyNewsDigest;
 import com.whyitrose.domain.digest.DailyNewsDigestItem;
 import com.whyitrose.domain.digest.DailyNewsDigestItemRepository;
-import com.whyitrose.domain.digest.DailyNewsDigestRepository;
 import com.whyitrose.domain.fcm.FcmToken;
 import com.whyitrose.domain.fcm.FcmTokenRepository;
 import com.whyitrose.domain.interest.InterestStock;
@@ -28,7 +26,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 
 @Slf4j
@@ -38,7 +35,6 @@ public class FcmSendStep implements ItemProcessor<Notification, NotificationLog>
 
     private static final String TITLE = "오늘의 관심 종목 뉴스가 도착했어요 📈";
 
-    private final DailyNewsDigestRepository dailyNewsDigestRepository;
     private final DailyNewsDigestItemRepository dailyNewsDigestItemRepository;
     private final NotificationLogRepository notificationLogRepository;
     private final FcmTokenRepository fcmTokenRepository;
@@ -59,29 +55,27 @@ public class FcmSendStep implements ItemProcessor<Notification, NotificationLog>
         shouldSkip = false;
         successCount = 0;
         failureCount = 0;
+        stockIdToName = new HashMap<>();
+        stockIdToNewsIds = new HashMap<>();
+        digestStockIds = new HashSet<>();
 
-        Optional<DailyNewsDigest> digestOpt = dailyNewsDigestRepository.findByDigestDate(today);
-        if (digestOpt.isEmpty()) {
-            log.info("no digest found for {}, skipping", today);
+        // DigestGenerationStep이 jobExecutionContext에 저장한 digestId 사용
+        long digestId = stepExecution.getJobExecution().getExecutionContext().getLong("digestId", 0L);
+        if (digestId == 0L) {
+            log.info("no digestId in jobExecutionContext for {}, skipping", today);
             shouldSkip = true;
-            stepExecution.getExecutionContext().putLong("digestId", 0L);
             return;
         }
 
-        DailyNewsDigest digest = digestOpt.get();
-
-        if (notificationLogRepository.existsByNotification_DigestId(digest.getId())) {
-            log.info("fcm already sent for {}, skipping", today);
+        if (notificationLogRepository.existsByNotification_DigestId(digestId)) {
+            log.info("fcm already sent for digestId={}, skipping", digestId);
             shouldSkip = true;
-            stepExecution.getExecutionContext().putLong("digestId", 0L);
             return;
         }
 
         List<DailyNewsDigestItem> items = dailyNewsDigestItemRepository
-                .findByDigestIdWithStockAndNews(digest.getId());
+                .findByDigestIdWithStockAndNews(digestId);
 
-        stockIdToName = new HashMap<>();
-        stockIdToNewsIds = new HashMap<>();
         for (DailyNewsDigestItem item : items) {
             Long stockId = item.getStock().getId();
             stockIdToName.put(stockId, item.getStock().getName());
@@ -89,8 +83,6 @@ public class FcmSendStep implements ItemProcessor<Notification, NotificationLog>
                     .add(item.getNews().getId());
         }
         digestStockIds = stockIdToName.keySet();
-
-        stepExecution.getExecutionContext().putLong("digestId", digest.getId());
     }
 
     @Override
@@ -118,11 +110,30 @@ public class FcmSendStep implements ItemProcessor<Notification, NotificationLog>
 
         try {
             BatchResponse response = fcmService.sendMulticast(tokenStrings, TITLE, body);
+
+            // 개별 응답 확인 — 만료/무효 토큰 삭제
+            List<com.google.firebase.messaging.SendResponse> responses = response.getResponses();
+            for (int i = 0; i < responses.size(); i++) {
+                com.google.firebase.messaging.SendResponse sendResponse = responses.get(i);
+                if (!sendResponse.isSuccessful()) {
+                    com.google.firebase.messaging.FirebaseMessagingException ex = sendResponse.getException();
+                    // UNREGISTERED: 앱 삭제 등으로 토큰이 만료된 경우에만 삭제
+                    // INVALID_ARGUMENT는 메시지 형식 문제일 수 있으므로 토큰 삭제 대상에서 제외
+                    if (ex != null &&
+                            ex.getMessagingErrorCode() == com.google.firebase.messaging.MessagingErrorCode.UNREGISTERED) {
+                        String expiredToken = tokenStrings.get(i);
+                        log.info("만료된 FCM 토큰 삭제 — userId={}", notification.getUser().getId());
+                        fcmTokenRepository.deleteByToken(expiredToken);
+                    }
+                }
+            }
+
             NotificationLog notificationLog = NotificationLog.create(notification,
                     String.format("{\"successCount\": %d, \"failureCount\": %d}",
                             response.getSuccessCount(), response.getFailureCount()));
 
-            if (response.getFailureCount() == 0) {
+            // 1건이라도 성공하면 발송 완료로 처리
+            if (response.getSuccessCount() > 0) {
                 notificationLog.markAsSent();
                 successCount++;
             } else {

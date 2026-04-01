@@ -48,8 +48,11 @@ public class DailyNotificationJobConfig {
                         .addLocalDate("runDate", LocalDate.now())
                         .toJobParameters())
                 .start(digestGenerationJobStep)
-                .next(notificationCreationJobStep)
+                    .on("NO_DIGEST").end()          // digest 없으면 정상 종료
+                    .from(digestGenerationJobStep)
+                    .on("*").to(notificationCreationJobStep)
                 .next(fcmSendJobStep)
+                .end()
                 .build();
     }
 
@@ -96,7 +99,7 @@ public class DailyNotificationJobConfig {
     @Bean
     @StepScope
     public JpaPagingItemReader<Notification> notificationItemReader(
-            @Value("#{stepExecutionContext['digestId']}") Long digestId) {
+            @Value("#{jobExecutionContext['digestId']}") Long digestId) {
         return new JpaPagingItemReaderBuilder<Notification>()
                 .name("notificationItemReader")
                 .entityManagerFactory(entityManagerFactory)
