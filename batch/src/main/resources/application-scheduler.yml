@@ -8,9 +8,14 @@ stock:
     days-back: 1
     scheduler:
       enabled: true
-    daily-cron: "0 17 12 * * MON-FRI"
+    daily-cron: "0 24 13 * * MON-FRI"
 
 notification:
   scheduler:
     enabled: true
     cron: "0 50 12 * * *"  # 테스트용, 운영 시 제거하면 기본값 0 0 8 * * * 적용
+
+prediction:
+  scheduler:
+    enabled: true
+    cron: "0 46 10 * * *"  # 테스트용, 운영 시 제거하면 기본값 0 0 18 * * * 적용
