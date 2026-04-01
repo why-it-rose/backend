@@ -45,6 +45,8 @@ public class NotificationCreationStep implements ItemProcessor<User, Notificatio
         LocalDate today = LocalDate.now();
         log.info("NotificationCreationStep started - date={}", today);
         shouldSkip = false;
+        todayDigest = null;
+        digestStockIds = null;
 
         Optional<DailyNewsDigest> digestOpt = dailyNewsDigestRepository.findByDigestDate(today);
         if (digestOpt.isEmpty()) {
