@@ -8,6 +8,7 @@ import com.whyitrose.domain.news.NewsStock;
 import com.whyitrose.domain.news.NewsStockRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.batch.core.ExitStatus;
 import org.springframework.batch.core.StepContribution;
 import org.springframework.batch.core.scope.context.ChunkContext;
 import org.springframework.batch.core.step.tasklet.Tasklet;
@@ -33,8 +34,13 @@ public class DigestGenerationStep implements Tasklet {
         LocalDate today = LocalDate.now();
         log.info("DigestGenerationStep started - date={}", today);
 
-        if (dailyNewsDigestRepository.existsByDigestDate(today)) {
-            log.info("digest already exists for {}, skipping", today);
+        // digest가 이미 존재하는 경우(재실행 케이스): 생성은 skip하되 digestId는 jobContext에 넘겨 이후 알림 step이 실행되도록 함
+        DailyNewsDigest existingDigest = dailyNewsDigestRepository.findByDigestDate(today).orElse(null);
+        if (existingDigest != null) {
+            log.info("digest already exists for {}, passing digestId={} to next steps", today, existingDigest.getId());
+            chunkContext.getStepContext().getStepExecution()
+                    .getJobExecution().getExecutionContext()
+                    .putLong("digestId", existingDigest.getId());
             return RepeatStatus.FINISHED;
         }
 
@@ -45,6 +51,7 @@ public class DigestGenerationStep implements Tasklet {
 
         if (newsStocks.isEmpty()) {
             log.info("no news found for {}, skipping digest creation", today);
+            contribution.setExitStatus(new ExitStatus("NO_DIGEST"));
             return RepeatStatus.FINISHED;
         }
 
@@ -62,6 +69,11 @@ public class DigestGenerationStep implements Tasklet {
                 .count();
         digest.activate(distinctNewsCount);
         dailyNewsDigestRepository.save(digest);
+
+        // 이후 step(FcmSendStep)에서 재조회 없이 digestId 사용
+        chunkContext.getStepContext().getStepExecution()
+                .getJobExecution().getExecutionContext()
+                .putLong("digestId", digest.getId());
 
         log.info("digest created - date={}, newsCount={}, itemCount={}", today, distinctNewsCount, items.size());
 
