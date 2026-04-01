@@ -12,7 +12,8 @@ public record MyScrapSearchItemResponse(
         String eventType,
         LocalDate startDate,
         BigDecimal changePct,
-        boolean isScrapped
+        boolean isScrapped,
+        String logoUrl
 ) {
     public static MyScrapSearchItemResponse from(Scrap scrap) {
         return new MyScrapSearchItemResponse(
@@ -22,7 +23,8 @@ public record MyScrapSearchItemResponse(
                 scrap.getEvent().getEventType().name(),
                 scrap.getEvent().getStartDate(),
                 scrap.getEvent().getChangePct(),
-                true
-        );
+                true,
+                scrap.getEvent().getStock().getLogoUrl()
+                );
     }
 }

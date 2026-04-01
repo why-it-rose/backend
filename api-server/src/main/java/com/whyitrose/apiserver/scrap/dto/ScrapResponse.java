@@ -38,7 +38,10 @@ public record ScrapResponse(
         LocalDate endDate,
 
         @Schema(description = "스크랩 일시", example = "2026-03-30T10:00:00")
-        LocalDateTime scrapedAt
+        LocalDateTime scrapedAt,
+
+        @Schema(description = "종목 로고 URL", example = "https://cdn.example.com/logo/005930.png")
+        String logoUrl
 ) {
     public static ScrapResponse from(Scrap scrap) {
         return new ScrapResponse(
@@ -51,7 +54,8 @@ public record ScrapResponse(
                 scrap.getEvent().getChangePct(),
                 scrap.getEvent().getStartDate(),
                 scrap.getEvent().getEndDate(),
-                scrap.getCreatedAt()
+                scrap.getCreatedAt(),
+                scrap.getEvent().getStock().getLogoUrl()
         );
     }
 }
