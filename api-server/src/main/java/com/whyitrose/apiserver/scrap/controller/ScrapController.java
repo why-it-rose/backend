@@ -20,6 +20,7 @@ import java.util.List;
 @Tag(name = "scrap-controller", description = "스크랩 API")
 @RestController
 @RequiredArgsConstructor
+@RequestMapping("/api")
 public class ScrapController {
 
     private final ScrapService scrapService;

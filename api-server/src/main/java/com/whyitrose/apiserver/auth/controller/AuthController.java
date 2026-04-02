@@ -16,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import com.whyitrose.apiserver.auth.dto.UpdateMeRequest;
+import com.whyitrose.apiserver.auth.dto.UpdatePushEnabledRequest;
 
 @RestController
 @RequiredArgsConstructor
@@ -116,4 +117,15 @@ public class AuthController {
         }
         return null;
     }
+
+    @PatchMapping("/me/push-enabled")
+    public ResponseEntity<BaseResponse<Void>> updatePushEnabled(
+            Authentication authentication,
+            @RequestBody @Valid UpdatePushEnabledRequest request
+    ) {
+        Long userId = extractPrincipalUserId(authentication);
+        authService.updatePushEnabled(userId, request);
+        return ResponseEntity.ok(BaseResponse.success(null));
+    }
+
 }

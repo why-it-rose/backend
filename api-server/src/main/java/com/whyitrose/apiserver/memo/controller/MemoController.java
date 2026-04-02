@@ -30,7 +30,7 @@ import java.util.List;
 @Tag(name = "memo-controller", description = "메모 API")
 @RestController
 @RequiredArgsConstructor
-@RequestMapping
+@RequestMapping("/api")
 public class MemoController {
 
     private final MemoService memoService;

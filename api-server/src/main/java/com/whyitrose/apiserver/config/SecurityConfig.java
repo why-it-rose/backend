@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -64,8 +65,11 @@ public class SecurityConfig {
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
                                 "/actuator/health",
-                                "/api/stocks/**"
-                                ).permitAll()
+                                "/api/stocks/**",
+                                "/actuator/prometheus"
+                        ).permitAll()
+                        // 비로그인 사용자도 차트 이벤트 핀 조회 가능 (POST /detect 등은 인증 유지)
+                        .requestMatchers(HttpMethod.GET, "/api/events").permitAll()
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(exception -> exception
