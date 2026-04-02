@@ -70,6 +70,43 @@ public class StockDtos {
             boolean isInterested
     ) {}
 
+    public record StockCompanyResponse(
+            Long stockId,
+            String ticker,
+            String name,
+            String market,
+            String logoUrl,
+            List<String> sectorTags,
+            long marketCap,
+            Integer marketRank,
+            long totalShares,
+            double foreignRatio,
+            String industryGroup,
+            String subIndustry,
+            long week52Low,
+            long week52High,
+            String overview,
+            CompanyFinancials financials,
+            InvestorTrading investorTrading
+    ) {}
+
+    public record CompanyFinancials(
+            String baseDate,
+            long revenue,
+            double revenueGrowthRate,
+            long operatingProfit,
+            double operatingProfitGrowthRate,
+            long netProfit,
+            double netProfitGrowthRate
+    ) {}
+
+    public record InvestorTrading(
+            String baseDate,
+            long foreign,
+            long institution,
+            long individual
+    ) {}
+
     public record TodayOhlcv(
             long open,
             long high,

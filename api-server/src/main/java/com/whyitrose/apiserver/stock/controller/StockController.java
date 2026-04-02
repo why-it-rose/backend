@@ -1,6 +1,7 @@
 package com.whyitrose.apiserver.stock.controller;
 
 import com.whyitrose.apiserver.stock.dto.StockDtos.StockDetailResponse;
+import com.whyitrose.apiserver.stock.dto.StockDtos.StockCompanyResponse;
 import com.whyitrose.apiserver.stock.dto.StockDtos.StockListResponse;
 import com.whyitrose.apiserver.stock.dto.StockDtos.StockPricesResponse;
 import com.whyitrose.apiserver.stock.dto.StockDtos.StockSearchResponse;
@@ -52,5 +53,10 @@ public class StockController {
             @RequestParam(defaultValue = "6M") String period
     ) {
         return ResponseEntity.ok(BaseResponse.success(stockService.getStockPrices(stockId, period)));
+    }
+
+    @GetMapping("/{stockId}/company")
+    public ResponseEntity<BaseResponse<StockCompanyResponse>> getStockCompany(@PathVariable Long stockId) {
+        return ResponseEntity.ok(BaseResponse.success(stockService.getStockCompany(stockId)));
     }
 }

@@ -9,6 +9,9 @@ stock:
     scheduler:
       enabled: true
     daily-cron: "0 17 12 * * MON-FRI"
+  company:
+    snapshot-cron: "0 0 4 * * *"
+    snapshot-zone: "Asia/Seoul"
 
 notification:
   scheduler:

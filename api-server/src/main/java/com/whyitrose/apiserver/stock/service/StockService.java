@@ -1,7 +1,12 @@
 package com.whyitrose.apiserver.stock.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.whyitrose.apiserver.stock.dto.StockDtos.CandleDto;
 import com.whyitrose.apiserver.stock.dto.StockDtos.ChangeDirection;
+import com.whyitrose.apiserver.stock.dto.StockDtos.CompanyFinancials;
+import com.whyitrose.apiserver.stock.dto.StockDtos.InvestorTrading;
+import com.whyitrose.apiserver.stock.dto.StockDtos.StockCompanyResponse;
 import com.whyitrose.apiserver.stock.dto.StockDtos.StockDetailResponse;
 import com.whyitrose.apiserver.stock.dto.StockDtos.StockListItem;
 import com.whyitrose.apiserver.stock.dto.StockDtos.StockListResponse;
@@ -10,9 +15,20 @@ import com.whyitrose.apiserver.stock.dto.StockDtos.StockSearchItem;
 import com.whyitrose.apiserver.stock.dto.StockDtos.StockSearchResponse;
 import com.whyitrose.apiserver.stock.dto.StockDtos.TodayOhlcv;
 import com.whyitrose.apiserver.stock.exception.StockErrorCode;
+import com.whyitrose.apiserver.stock.fss.FssCorpBasicClient;
+import com.whyitrose.apiserver.stock.fss.FssCompanyProfile;
+import com.whyitrose.apiserver.stock.kis.KisFinancialRatio;
+import com.whyitrose.apiserver.stock.kis.KisFinancialRatioClient;
+import com.whyitrose.apiserver.stock.kis.KisIncomeStatement;
+import com.whyitrose.apiserver.stock.kis.KisInvestorTrading;
+import com.whyitrose.apiserver.stock.kis.KisStockBasicInfo;
+import com.whyitrose.apiserver.stock.ls.LsCompanyInfo;
+import com.whyitrose.apiserver.stock.ls.LsInvestInfoClient;
 import com.whyitrose.core.exception.BaseException;
 import com.whyitrose.domain.common.Status;
 import com.whyitrose.domain.stock.Stock;
+import com.whyitrose.domain.stock.StockCompanySnapshot;
+import com.whyitrose.domain.stock.StockCompanySnapshotRepository;
 import com.whyitrose.domain.stock.StockListSnapshot;
 import com.whyitrose.domain.stock.StockListSnapshotRepository;
 import com.whyitrose.domain.stock.StockMarket;
@@ -29,19 +45,27 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 @Transactional
 public class StockService {
+    private static final TypeReference<List<String>> STRING_LIST_TYPE = new TypeReference<>() {};
 
     private final StockRepository stockRepository;
     private final StockPriceRepository stockPriceRepository;
     private final StockListSnapshotRepository stockListSnapshotRepository;
+    private final StockCompanySnapshotRepository stockCompanySnapshotRepository;
+    private final LsInvestInfoClient lsInvestInfoClient;
+    private final KisFinancialRatioClient kisFinancialRatioClient;
+    private final FssCorpBasicClient fssCorpBasicClient;
+    private final ObjectMapper objectMapper;
 
     public StockListResponse getStocks(String market, String sort, String period, String cursor, Integer size) {
         int pageSize = Math.max(1, Math.min(size == null ? 20 : size, 100));
@@ -184,6 +208,193 @@ public class StockService {
                 .toList();
 
         return new StockPricesResponse(stock.getId(), key, candles, List.of(), List.of());
+    }
+
+    public StockCompanyResponse getStockCompany(Long stockId) {
+        Stock stock = stockRepository.findById(stockId)
+                .orElseThrow(() -> new BaseException(StockErrorCode.STOCK_001));
+        StockCompanySnapshot snapshot = stockCompanySnapshotRepository.findByStockId(stockId)
+                .orElseGet(() -> refreshOneStockCompanySnapshot(stock));
+        Week52PriceRange week52 = resolveWeek52Range(stock.getId());
+
+        List<String> sectorTags = parseSectorTags(snapshot.getSectorTagsJson());
+
+        return new StockCompanyResponse(
+                stock.getId(),
+                stock.getTicker(),
+                stock.getName(),
+                stock.getMarket().name(),
+                stock.getLogoUrl(),
+                sectorTags,
+                nvl(snapshot.getMarketCap()),
+                resolveMarketRank(snapshot, stock.getMarket()),
+                nvl(snapshot.getTotalShares()),
+                nvl(snapshot.getForeignRatio()),
+                snapshot.getIndustryGroup(),
+                snapshot.getSubIndustry(),
+                week52.low(),
+                week52.high(),
+                snapshot.getOverview(),
+                new CompanyFinancials(
+                        snapshot.getFinancialBaseDate(),
+                        nvl(snapshot.getRevenue()),
+                        nvl(snapshot.getRevenueGrowthRate()),
+                        nvl(snapshot.getOperatingProfit()),
+                        nvl(snapshot.getOperatingProfitGrowthRate()),
+                        nvl(snapshot.getNetProfit()),
+                        nvl(snapshot.getNetProfitGrowthRate())
+                ),
+                new InvestorTrading(
+                        snapshot.getInvestorBaseDate(),
+                        nvl(snapshot.getInvestorForeign()),
+                        nvl(snapshot.getInvestorInstitution()),
+                        nvl(snapshot.getInvestorIndividual())
+                )
+        );
+    }
+
+    public synchronized void refreshAllStockCompanySnapshots() {
+        List<Stock> stocks = stockRepository.findByStatusOrderByIdAsc(Status.ACTIVE);
+        int total = stocks.size();
+        if (total == 0) {
+            log.info("Company snapshot refresh skipped: no active stocks.");
+            return;
+        }
+        int success = 0;
+        int failed = 0;
+        for (int i = 0; i < total; i++) {
+            Stock stock = stocks.get(i);
+            int progress = (int) Math.round(((i + 1) * 100.0) / total);
+            log.info("Company snapshot progress: {}/{} ({}%) stockId={}, ticker={}",
+                    i + 1, total, progress, stock.getId(), stock.getTicker());
+            try {
+                refreshOneStockCompanySnapshot(stock);
+                success++;
+            } catch (Exception e) {
+                failed++;
+                log.error("Company snapshot refresh failed. stockId={}, ticker={}, name={}",
+                        stock.getId(), stock.getTicker(), stock.getName(), e);
+            }
+        }
+        refreshMarketRanks();
+        log.info("Company snapshot refresh completed. total={}, success={}, failed={}", total, success, failed);
+    }
+
+    private StockCompanySnapshot refreshOneStockCompanySnapshot(Stock stock) {
+        LsCompanyInfo lsInfo;
+        KisIncomeStatement kisIncome;
+        KisFinancialRatio kisRatio;
+        KisInvestorTrading kisTrading;
+        KisStockBasicInfo kisStockBasicInfo;
+        try {
+            lsInfo = lsInvestInfoClient.fetchCompanyInfo(stock.getTicker());
+        } catch (Exception e) {
+            throw new IllegalStateException("LS company info failed for ticker=" + stock.getTicker(), e);
+        }
+        try {
+            kisIncome = kisFinancialRatioClient.fetchYearlyIncomeStatement(stock.getTicker());
+        } catch (Exception e) {
+            throw new IllegalStateException("KIS income statement failed for ticker=" + stock.getTicker(), e);
+        }
+        try {
+            kisRatio = kisFinancialRatioClient.fetchYearlyRatio(stock.getTicker());
+        } catch (Exception e) {
+            throw new IllegalStateException("KIS financial ratio failed for ticker=" + stock.getTicker(), e);
+        }
+        try {
+            kisTrading = kisFinancialRatioClient.fetchInvestorTradingDaily(stock.getTicker());
+        } catch (Exception e) {
+            throw new IllegalStateException("KIS investor trading failed for ticker=" + stock.getTicker(), e);
+        }
+        try {
+            kisStockBasicInfo = kisFinancialRatioClient.fetchStockBasicInfo(stock.getTicker());
+        } catch (Exception e) {
+            throw new IllegalStateException("KIS stock basic info failed for ticker=" + stock.getTicker(), e);
+        }
+        String industryGroup = normalizeIndustryGroup(lsInfo.industryGroup());
+        String subIndustry = kisStockBasicInfo.subIndustry();
+        FssCompanyProfile companyProfile = fssCorpBasicClient.fetchCompanyProfile(stock.getName(), industryGroup);
+        String overview = companyProfile.overview();
+        String sectorTagsJson = toSectorTagsJson(companyProfile.mainBiz());
+        String financialBaseDate = kisIncome.baseDate().isBlank() ? kisRatio.baseDate() : kisIncome.baseDate();
+        double revenueGrowthRate = resolveRevenueGrowthRate(kisIncome, kisRatio);
+        double operatingProfitGrowthRate = resolveProfitRate(kisIncome.operatingProfit(), kisIncome.revenue(), kisRatio.operatingProfitGrowthRate());
+        double netProfitGrowthRate = resolveProfitRate(kisIncome.netProfit(), kisIncome.revenue(), kisRatio.netProfitGrowthRate());
+
+        StockCompanySnapshot snapshot = stockCompanySnapshotRepository.findByStockId(stock.getId())
+                .orElseGet(() -> StockCompanySnapshot.create(stock));
+        snapshot.apply(
+                industryGroup,
+                subIndustry,
+                sectorTagsJson,
+                lsInfo.marketCap(),
+                lsInfo.totalShares(),
+                lsInfo.foreignRatio(),
+                overview,
+                financialBaseDate,
+                kisIncome.revenue(),
+                revenueGrowthRate,
+                kisIncome.operatingProfit(),
+                operatingProfitGrowthRate,
+                kisIncome.netProfit(),
+                netProfitGrowthRate,
+                kisTrading.baseDate(),
+                kisTrading.foreignNetBuyAmount(),
+                kisTrading.institutionNetBuyAmount(),
+                kisTrading.individualNetBuyAmount()
+        );
+        return stockCompanySnapshotRepository.save(snapshot);
+    }
+
+    private Week52PriceRange resolveWeek52Range(Long stockId) {
+        LocalDate to = LocalDate.now();
+        LocalDate from = to.minusWeeks(52);
+        List<StockPrice> prices = stockPriceRepository.findByStockIdAndPeriodAndTradingDateBetweenOrderByTradingDateAsc(
+                stockId, StockPricePeriod.DAILY, from, to);
+        if (prices.isEmpty()) {
+            return new Week52PriceRange(0L, 0L);
+        }
+        long low = Long.MAX_VALUE;
+        long high = Long.MIN_VALUE;
+        for (StockPrice price : prices) {
+            low = Math.min(low, price.getLowPrice());
+            high = Math.max(high, price.getHighPrice());
+        }
+        return new Week52PriceRange(low, high);
+    }
+
+    private Integer resolveMarketRank(StockCompanySnapshot snapshot, StockMarket market) {
+        if (snapshot.getMarketRank() != null) {
+            return snapshot.getMarketRank();
+        }
+        List<StockCompanySnapshot> ranked = rankSnapshotsForMarket(market);
+        for (int i = 0; i < ranked.size(); i++) {
+            StockCompanySnapshot candidate = ranked.get(i);
+            if (candidate.getStock().getId().equals(snapshot.getStock().getId())) {
+                return i + 1;
+            }
+        }
+        return null;
+    }
+
+    private void refreshMarketRanks() {
+        updateMarketRanks(StockMarket.KOSPI);
+        updateMarketRanks(StockMarket.KOSDAQ);
+    }
+
+    private void updateMarketRanks(StockMarket market) {
+        List<StockCompanySnapshot> ranked = rankSnapshotsForMarket(market);
+        for (int i = 0; i < ranked.size(); i++) {
+            ranked.get(i).updateMarketRank(i + 1);
+        }
+    }
+
+    private List<StockCompanySnapshot> rankSnapshotsForMarket(StockMarket market) {
+        return stockCompanySnapshotRepository
+                .findByStockMarketAndStockStatusAndMarketCapIsNotNullOrderByMarketCapDescStockIdAsc(
+                        market,
+                        Status.ACTIVE
+                );
     }
 
     private PriceSnapshot latestSnapshot(Long stockId, String period) {
@@ -404,6 +615,80 @@ public class StockService {
         return Math.round(value * 100.0) / 100.0;
     }
 
+    private double resolveRevenueGrowthRate(KisIncomeStatement income, KisFinancialRatio ratio) {
+        double upstream = ratio.revenueGrowthRate();
+        if (!isZeroRate(upstream)) {
+            return upstream;
+        }
+        if (income.previousRevenue() == 0L) {
+            return upstream;
+        }
+        return round2(((double) (income.revenue() - income.previousRevenue()) / income.previousRevenue()) * 100.0);
+    }
+
+    private double resolveProfitRate(long profit, long revenue, double upstream) {
+        if (!isZeroRate(upstream)) {
+            return upstream;
+        }
+        if (revenue == 0L) {
+            return upstream;
+        }
+        return round2(((double) profit / revenue) * 100.0);
+    }
+
+    private boolean isZeroRate(double value) {
+        return Math.abs(value) < 0.000001d;
+    }
+
+    private String normalizeIndustryGroup(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replaceFirst("^FICS\\s+", "").trim();
+    }
+
+    private String toSectorTagsJson(String mainBiz) {
+        String normalized = normalizeSectorTag(mainBiz);
+        try {
+            return normalized.isBlank()
+                    ? objectMapper.writeValueAsString(List.of())
+                    : objectMapper.writeValueAsString(List.of(normalized));
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to serialize sector tags", e);
+        }
+    }
+
+    private List<String> parseSectorTags(String sectorTagsJson) {
+        if (sectorTagsJson == null || sectorTagsJson.isBlank()) {
+            return List.of();
+        }
+        try {
+            List<String> values = objectMapper.readValue(sectorTagsJson, STRING_LIST_TYPE);
+            return values.stream()
+                    .map(this::normalizeSectorTag)
+                    .filter(value -> !value.isBlank())
+                    .distinct()
+                    .toList();
+        } catch (Exception ignored) {
+            return List.of();
+        }
+    }
+
+    private String normalizeSectorTag(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.trim();
+    }
+
+    private long nvl(Long value) {
+        return value == null ? 0L : value;
+    }
+
+    private double nvl(Double value) {
+        return value == null ? 0.0 : value;
+    }
+
     private record PriceSnapshot(
             long currentPrice,
             long priceChange,
@@ -419,4 +704,6 @@ public class StockService {
             long stockId,
             int nextRank
     ) {}
+
+    private record Week52PriceRange(long low, long high) {}
 }
