@@ -49,7 +49,7 @@
 | 파라미터 | 타입 | 필수 | 기본값 | 설명 |
 |---|---|---|---|---|
 | `market` | String | ❌ | `ALL` | `ALL` \| `KOSPI` \| `KOSDAQ` |
-| `sort` | String | ❌ | `TRADING_AMOUNT` | `TRADING_AMOUNT` \| `TRADING_VOLUME` \| `SURGE` \| `DROP` |
+| `sort` | String | ❌ | `TRADING_AMOUNT` | `TRADING_AMOUNT` \| `TRADING_VOLUME` \| `SURGE` \| `DROP` \| `MARKET_CAP` |
 | `period` | String | ❌ | `1D` | `REALTIME` \| `1D` \| `1W` \| `1M` \| `3M` \| `6M` |
 | `cursor` | String | ❌ | `null` | 이전 응답의 `nextCursor` 값 (최초 요청 시 생략) |
 | `size` | Integer | ❌ | `20` | 페이지당 항목 수 (최대 100) |

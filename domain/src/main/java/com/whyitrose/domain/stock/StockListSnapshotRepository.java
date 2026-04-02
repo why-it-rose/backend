@@ -130,4 +130,36 @@ public interface StockListSnapshotRepository extends JpaRepository<StockListSnap
             @Param("cursorStockId") long cursorStockId,
             Pageable pageable
     );
+
+    @Query("""
+            SELECT s FROM StockListSnapshot s
+            JOIN FETCH s.stock st
+            LEFT JOIN StockCompanySnapshot cp ON cp.stock.id = st.id
+            WHERE s.periodKey = :periodKey
+              AND (:market IS NULL OR st.market = :market)
+            ORDER BY COALESCE(cp.marketCap, 0) DESC, st.id ASC
+            """)
+    List<StockListSnapshot> findFirstByMarketCap(
+            @Param("periodKey") String periodKey,
+            @Param("market") StockMarket market,
+            Pageable pageable
+    );
+
+    @Query("""
+            SELECT s FROM StockListSnapshot s
+            JOIN FETCH s.stock st
+            LEFT JOIN StockCompanySnapshot cp ON cp.stock.id = st.id
+            WHERE s.periodKey = :periodKey
+              AND (:market IS NULL OR st.market = :market)
+              AND (COALESCE(cp.marketCap, 0) < :cursorValue
+                   OR (COALESCE(cp.marketCap, 0) = :cursorValue AND st.id > :cursorStockId))
+            ORDER BY COALESCE(cp.marketCap, 0) DESC, st.id ASC
+            """)
+    List<StockListSnapshot> findNextByMarketCap(
+            @Param("periodKey") String periodKey,
+            @Param("market") StockMarket market,
+            @Param("cursorValue") long cursorValue,
+            @Param("cursorStockId") long cursorStockId,
+            Pageable pageable
+    );
 }
