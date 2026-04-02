@@ -1,6 +1,7 @@
 package com.whyitrose.batch.stock;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.whyitrose.apiserver.stock.service.StockService;
 import com.whyitrose.batch.ls.LsMarketDataClient;
 import com.whyitrose.domain.common.Status;
 import com.whyitrose.domain.stock.Stock;
@@ -30,6 +31,7 @@ public class StockPriceLoadService {
     private final LsMarketDataClient lsMarketDataClient;
     private final StockRepository stockRepository;
     private final StockPriceRepository stockPriceRepository;
+    private final StockService stockService;
     private final TransactionTemplate transactionTemplate;
     @Value("${stock.price.single-ticker:}")
     private String singleTicker;
@@ -64,6 +66,8 @@ public class StockPriceLoadService {
             log.info("종목 적재 완료: [{}/{}] id={}, ticker={}", index, stocks.size(), stock.getId(), stock.getTicker());
             index++;
         }
+        stockService.refreshAllStockListSnapshots();
+        log.info("주가 리스트 스냅샷 재계산 완료");
         log.info("주가 차트(t8451) 적재 완료");
     }
 

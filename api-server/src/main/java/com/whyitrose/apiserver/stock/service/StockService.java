@@ -399,35 +399,86 @@ public class StockService {
 
     private PriceSnapshot latestSnapshot(Long stockId, String period) {
         String key = normalizePeriod(period);
-        StockPricePeriod mappedPeriod = resolvePricePeriod(key);
-        int tradingDays = resolveTradingDays(key);
-        return latestSnapshot(stockId, mappedPeriod, tradingDays);
+        return latestSnapshotForPeriod(stockId, key);
     }
 
-    private PriceSnapshot latestSnapshot(Long stockId, StockPricePeriod mappedPeriod, int tradingDays) {
-        List<StockPrice> desc = stockPriceRepository.findByStockIdAndPeriodOrderByTradingDateDesc(
-                stockId, mappedPeriod, PageRequest.of(0, Math.max(2, tradingDays + 1)));
+    private PriceSnapshot latestSnapshotForPeriod(Long stockId, String periodKey) {
+        return switch (normalizePeriod(periodKey)) {
+            case "REALTIME", "1D" -> latestDailySnapshot(stockId);
+            case "1W" -> latestFixedPeriodSnapshot(stockId, StockPricePeriod.WEEKLY);
+            case "1M" -> latestFixedPeriodSnapshot(stockId, StockPricePeriod.MONTHLY);
+            case "1Y" -> latestFixedPeriodSnapshot(stockId, StockPricePeriod.YEARLY);
+            case "3M" -> latestRollingDailySnapshot(stockId, 60);
+            case "6M" -> latestRollingDailySnapshot(stockId, 120);
+            default -> latestRollingDailySnapshot(stockId, 120);
+        };
+    }
+
+    private PriceSnapshot latestDailySnapshot(Long stockId) {
+        List<StockPrice> desc = stockPriceRepository.findTop2ByStockIdAndPeriodOrderByTradingDateDesc(
+                stockId, StockPricePeriod.DAILY);
         if (desc.isEmpty()) {
-            return new PriceSnapshot(0, 0, 0.0, ChangeDirection.FLAT, 0, 0);
+            return emptyPriceSnapshot();
+        }
+        StockPrice current = desc.get(0);
+        StockPrice previous = desc.size() > 1 ? desc.get(1) : current;
+        return buildPriceSnapshot(current, previous, current.getVolume(), calcTradingAmount(current));
+    }
+
+    private PriceSnapshot latestFixedPeriodSnapshot(Long stockId, StockPricePeriod period) {
+        List<StockPrice> desc = stockPriceRepository.findByStockIdAndPeriodOrderByTradingDateDesc(
+                stockId, period, PageRequest.of(0, 2));
+        if (desc.isEmpty()) {
+            return emptyPriceSnapshot();
+        }
+        StockPrice current = desc.get(0);
+        StockPrice previous = desc.size() > 1 ? desc.get(1) : current;
+        long tradingVolume = current.getVolume();
+        long tradingAmount = calcTradingAmount(current);
+        if (tradingVolume == 0L || tradingAmount == 0L) {
+            return latestDailySnapshot(stockId);
+        }
+        return buildPriceSnapshot(current, previous, tradingVolume, tradingAmount);
+    }
+
+    private PriceSnapshot latestRollingDailySnapshot(Long stockId, int tradingDays) {
+        List<StockPrice> desc = stockPriceRepository.findByStockIdAndPeriodOrderByTradingDateDesc(
+                stockId, StockPricePeriod.DAILY, PageRequest.of(0, Math.max(2, tradingDays + 1)));
+        if (desc.isEmpty()) {
+            return emptyPriceSnapshot();
         }
         StockPrice current = desc.get(0);
         StockPrice previous = desc.size() > tradingDays ? desc.get(tradingDays) : desc.get(desc.size() - 1);
-
-        long currentPrice = current.getClosePrice();
-        long previousPrice = previous == null ? currentPrice : previous.getClosePrice();
-        long change = currentPrice - previousPrice;
-        double rate = previousPrice == 0 ? 0.0 : ((double) change / previousPrice) * 100.0;
-        ChangeDirection direction = change > 0 ? ChangeDirection.UP : (change < 0 ? ChangeDirection.DOWN : ChangeDirection.FLAT);
         int windowSize = Math.max(1, Math.min(tradingDays, desc.size()));
         long tradingVolume = 0L;
         long tradingAmount = 0L;
         for (int i = 0; i < windowSize; i++) {
             StockPrice price = desc.get(i);
             tradingVolume += price.getVolume();
-            tradingAmount += (long) price.getClosePrice() * price.getVolume();
+            tradingAmount += calcTradingAmount(price);
         }
+        if (tradingVolume == 0L || tradingAmount == 0L) {
+            tradingVolume = current.getVolume();
+            tradingAmount = calcTradingAmount(current);
+        }
+        return buildPriceSnapshot(current, previous, tradingVolume, tradingAmount);
+    }
 
+    private PriceSnapshot buildPriceSnapshot(StockPrice current, StockPrice previous, long tradingVolume, long tradingAmount) {
+        long currentPrice = current.getClosePrice();
+        long previousPrice = previous == null ? currentPrice : previous.getClosePrice();
+        long change = currentPrice - previousPrice;
+        double rate = previousPrice == 0 ? 0.0 : ((double) change / previousPrice) * 100.0;
+        ChangeDirection direction = change > 0 ? ChangeDirection.UP : (change < 0 ? ChangeDirection.DOWN : ChangeDirection.FLAT);
         return new PriceSnapshot(currentPrice, change, round2(rate), direction, tradingAmount, tradingVolume);
+    }
+
+    private long calcTradingAmount(StockPrice price) {
+        return (long) price.getClosePrice() * price.getVolume();
+    }
+
+    private PriceSnapshot emptyPriceSnapshot() {
+        return new PriceSnapshot(0, 0, 0.0, ChangeDirection.FLAT, 0, 0);
     }
 
     private String normalizeSort(String sort) {
@@ -436,7 +487,7 @@ public class StockService {
         }
         String key = sort.toUpperCase(Locale.ROOT);
         return switch (key) {
-            case "TRADING_VOLUME", "SURGE", "DROP", "TRADING_AMOUNT" -> key;
+            case "TRADING_VOLUME", "SURGE", "DROP", "TRADING_AMOUNT", "MARKET_CAP" -> key;
             default -> "TRADING_AMOUNT";
         };
     }
@@ -461,6 +512,7 @@ public class StockService {
     ) {
         if (cursor == null) {
             return switch (sortKey) {
+                case "MARKET_CAP" -> stockListSnapshotRepository.findFirstByMarketCap(periodKey, marketFilter, pageable);
                 case "TRADING_VOLUME" -> stockListSnapshotRepository.findFirstByTradingVolume(periodKey, marketFilter, pageable);
                 case "SURGE" -> stockListSnapshotRepository.findFirstBySurge(periodKey, marketFilter, pageable);
                 case "DROP" -> stockListSnapshotRepository.findFirstByDrop(periodKey, marketFilter, pageable);
@@ -468,6 +520,13 @@ public class StockService {
             };
         }
         return switch (sortKey) {
+            case "MARKET_CAP" -> stockListSnapshotRepository.findNextByMarketCap(
+                    periodKey,
+                    marketFilter,
+                    Long.parseLong(cursor.sortValue()),
+                    cursor.stockId(),
+                    pageable
+            );
             case "TRADING_VOLUME" -> stockListSnapshotRepository.findNextByTradingVolume(
                     periodKey,
                     marketFilter,
@@ -518,9 +577,8 @@ public class StockService {
                 .collect(java.util.stream.Collectors.toMap(s -> s.getStock().getId(), s -> s));
 
         List<StockListSnapshot> upserts = new ArrayList<>(stocks.size());
-        int tradingDays = resolveTradingDays(periodKey);
         for (Stock stock : stocks) {
-            PriceSnapshot snapshot = latestSnapshot(stock.getId(), mappedPeriod, tradingDays);
+            PriceSnapshot snapshot = latestSnapshotForPeriod(stock.getId(), periodKey);
             StockListSnapshot existing = existingByStockId.get(stock.getId());
             if (existing == null) {
                 upserts.add(StockListSnapshot.create(
@@ -549,10 +607,17 @@ public class StockService {
     private StockListCursor buildCursor(String sortKey, StockListSnapshot row, int nextRank) {
         Long stockId = row.getStock().getId();
         return switch (sortKey) {
+            case "MARKET_CAP" -> new StockListCursor(sortKey, String.valueOf(resolveMarketCapForList(row.getStock().getId())), stockId, nextRank);
             case "TRADING_VOLUME" -> new StockListCursor(sortKey, String.valueOf(row.getTradingVolume()), stockId, nextRank);
             case "SURGE", "DROP" -> new StockListCursor(sortKey, String.valueOf(row.getChangeRate()), stockId, nextRank);
             default -> new StockListCursor(sortKey, String.valueOf(row.getTradingAmount()), stockId, nextRank);
         };
+    }
+
+    private long resolveMarketCapForList(Long stockId) {
+        return stockCompanySnapshotRepository.findByStockId(stockId)
+                .map(StockCompanySnapshot::getMarketCap)
+                .orElse(0L);
     }
 
     private String encodeCursor(StockListCursor cursor) {
