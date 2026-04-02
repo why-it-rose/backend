@@ -1,10 +1,12 @@
 package com.whyitrose.apiserver.stock.controller;
 
 import com.whyitrose.apiserver.stock.dto.StockDtos.StockDetailResponse;
+import com.whyitrose.apiserver.stock.dto.StockDtos.MarketBottomBarResponse;
 import com.whyitrose.apiserver.stock.dto.StockDtos.StockCompanyResponse;
 import com.whyitrose.apiserver.stock.dto.StockDtos.StockListResponse;
 import com.whyitrose.apiserver.stock.dto.StockDtos.StockPricesResponse;
 import com.whyitrose.apiserver.stock.dto.StockDtos.StockSearchResponse;
+import com.whyitrose.apiserver.stock.service.MarketBottomBarService;
 import com.whyitrose.apiserver.stock.service.StockService;
 import com.whyitrose.core.response.BaseResponse;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class StockController {
 
     private final StockService stockService;
+    private final MarketBottomBarService marketBottomBarService;
 
     @GetMapping
     public ResponseEntity<BaseResponse<StockListResponse>> getStocks(
@@ -40,6 +43,11 @@ public class StockController {
             @RequestParam(defaultValue = "10") Integer limit
     ) {
         return ResponseEntity.ok(BaseResponse.success(stockService.searchStocks(q, limit)));
+    }
+
+    @GetMapping("/market-bottom-bar")
+    public ResponseEntity<BaseResponse<MarketBottomBarResponse>> getMarketBottomBar() {
+        return ResponseEntity.ok(BaseResponse.success(marketBottomBarService.getItems()));
     }
 
     @GetMapping("/{stockId}")

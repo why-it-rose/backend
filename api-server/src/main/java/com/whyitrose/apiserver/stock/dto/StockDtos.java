@@ -55,6 +55,21 @@ public class StockDtos {
             ChangeDirection changeDirection
     ) {}
 
+    public record MarketBottomBarResponse(
+            List<MarketBottomBarItemDto> items
+    ) {}
+
+    public record MarketBottomBarItemDto(
+            String id,
+            String label,
+            String shcode,
+            String infoUrl,
+            long currentPrice,
+            long priceChange,
+            double changeRate,
+            ChangeDirection changeDirection
+    ) {}
+
     public record StockDetailResponse(
             Long stockId,
             String ticker,
