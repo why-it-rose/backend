@@ -9,7 +9,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
-@SpringBootApplication(scanBasePackages = {"com.whyitrose.batch", "com.whyitrose.core"})
+@SpringBootApplication(scanBasePackages = {"com.whyitrose.batch", "com.whyitrose.core", "com.whyitrose.apiserver.stock"})
 @EnableJpaAuditing
 @EntityScan(basePackages = "com.whyitrose.domain")
 @EnableJpaRepositories(basePackages = "com.whyitrose.domain")

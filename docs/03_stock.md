@@ -434,18 +434,18 @@
     "overview": "삼성전자는 1969년 설립된 기업으로 반도체, 전자 제품 제조·판매업을 영위하고 있다...",
     "financials": {
       "baseDate": "2025-12",
-      "revenue": 333000000000000,
+      "revenue": 3330000,
       "revenueGrowthRate": 10.88,
-      "operatingProfit": 43000000000000,
+      "operatingProfit": 430000,
       "operatingProfitGrowthRate": 33.23,
-      "netProfit": 45000000000000,
+      "netProfit": 450000,
       "netProfitGrowthRate": 31.22
     },
     "investorTrading": {
       "baseDate": "2026-03-18",
-      "foreign": -250000000000,
-      "institution": 180000000000,
-      "individual": 70000000000
+      "foreign": -7278,
+      "institution": 24834,
+      "individual": -16339
     }
   }
 }
@@ -462,7 +462,10 @@
 | `week52High` | Long | 52주 최고가 (원) |
 | `overview` | String | 기업 개요 텍스트 |
 | `financials.baseDate` | String | 실적 기준 연월 (YYYY-MM) |
-| `investorTrading` | Object | 투자자별 매매동향 (원, 당일 기준) |
+| `financials.revenue` | Long | 매출액 (억) |
+| `financials.operatingProfit` | Long | 영업이익 (억) |
+| `financials.netProfit` | Long | 당기순이익 (억) |
+| `investorTrading` | Object | 투자자별 순매수 수량 (주, 당일 기준) |
 
 **실패**
 
